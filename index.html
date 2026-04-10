@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>潮汐孤岛</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="panel left">
+      <div class="brand">
+        <strong>潮汐孤岛</strong>
+        <span id="dayInfo">第 1 天 · 清晨</span>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="row subtle">
+        <span id="weatherInfo">海风平稳</span>
+        <span id="scoreInfo">生存评分 0</span>
+      </div>
+      <div class="message" id="message"></div>
+      <div class="hint" id="hint"></div>
+      <div class="controls">WASD 移动 · Shift 冲刺 · 左键行动 · E 交互 · 滚轮/1-5 切换快捷栏 · 右键背包/快捷栏菜单</div>
+    </div>
+
+    <div class="panel right">
+      <div>
+        <div class="section-title">背包</div>
+        <div class="inventory" id="inventory"></div>
+      </div>
+      <div>
+        <div class="section-title">制作</div>
+        <div class="craft-list" id="craftList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hotbar" id="hotbar"></div>
+
+  <div class="item-tooltip" id="itemTooltip"></div>
+
+  <div class="context-menu" id="itemMenu">
+    <div class="context-menu-title" id="itemMenuTitle"></div>
+    <button type="button" id="itemMenuUseBtn">使用</button>
+    <button type="button" id="itemMenuBindBtn">放入当前快捷栏</button>
+    <button type="button" id="itemMenuDropBtn">丢弃 1 个</button>
+    <button type="button" id="itemMenuClearBtn">移出快捷栏</button>
+  </div>
+
+  <div class="overlay show" id="startOverlay">
+    <div class="overlay-card">
+      <h1>潮汐孤岛</h1>
+      <p>你被困在一座会呼吸的海岛。白天采集木材、石块、纤维与食物；夜晚点燃篝火、搭建防线、对抗从海岸爬上的暗潮生物。</p>
+      <ul>
+        <li>砍树、采石、搜集灌木与椰子，维持饥饿和口渴。</li>
+        <li>先收集材料，再把武器、工具和建造套件制作进背包与快捷栏。</li>
+        <li>夜晚敌人会追踪你，篝火能提供光亮与缓慢恢复。</li>
+      </ul>
+      <div class="overlay-actions">
+        <button class="primary" id="startBtn">开始生存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay">
+    <div class="overlay-card">
+      <h2>营地失守</h2>
+      <p id="gameOverText" class="danger-text"></p>
+      <div class="overlay-actions">
+        <button class="primary" id="restartBtn">重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/core.js" defer></script>
+  <script src="src/core/dom.js" defer></script>
+  <script src="src/core/constants.js" defer></script>
+  <script src="src/data/items.js" defer></script>
+  <script src="src/data/recipes.js" defer></script>
+  <script src="src/core/state.js" defer></script>
+  <script src="src/shared/math.js" defer></script>
+  <script src="src/shared/random.js" defer></script>
+  <script src="src/ecs/core.js" defer></script>
+  <script src="src/inventory/storage.js" defer></script>
+  <script src="src/game/player-helpers.js" defer></script>
+  <script src="src/inventory/references.js" defer></script>
+  <script src="src/world/helpers.js" defer></script>
+  <script src="src/components/tiles/deep.js" defer></script>
+  <script src="src/components/tiles/water.js" defer></script>
+  <script src="src/components/tiles/sand.js" defer></script>
+  <script src="src/components/tiles/grass.js" defer></script>
+  <script src="src/components/tiles/meadow.js" defer></script>
+  <script src="src/components/tiles/stone.js" defer></script>
+  <script src="src/components/tiles/registry.js" defer></script>
+  <script src="src/components/tiles.js" defer></script>
+  <script src="src/components/entities/tree.js" defer></script>
+  <script src="src/components/entities/palm.js" defer></script>
+  <script src="src/components/entities/rock.js" defer></script>
+  <script src="src/components/entities/bush.js" defer></script>
+  <script src="src/components/entities/registry.js" defer></script>
+  <script src="src/components/entities.js" defer></script>
+  <script src="src/components/structures/campfire.js" defer></script>
+  <script src="src/components/structures/wall.js" defer></script>
+  <script src="src/components/structures/floor.js" defer></script>
+  <script src="src/components/structures/collector.js" defer></script>
+  <script src="src/components/structures/registry.js" defer></script>
+  <script src="src/components/structures.js" defer></script>
+  <script src="src/components/enemies/crawler.js" defer></script>
+  <script src="src/components/enemies/registry.js" defer></script>
+  <script src="src/components/enemies.js" defer></script>
+  <script src="src/systems/factories/creators.js" defer></script>
+  <script src="src/systems/factories/queries.js" defer></script>
+  <script src="src/systems/factories/effects.js" defer></script>
+  <script src="src/systems/factories.js" defer></script>
+  <script src="src/world/generation.js" defer></script>
+  <script src="src/game/time.js" defer></script>
+  <script src="src/world.js" defer></script>
+  <script src="src/systems/actions/movement.js" defer></script>
+  <script src="src/systems/actions/harvest.js" defer></script>
+  <script src="src/systems/actions/combat.js" defer></script>
+  <script src="src/systems/actions/building.js" defer></script>
+  <script src="src/inventory/actions.js" defer></script>
+  <script src="src/systems/action-system.js" defer></script>
+  <script src="src/systems/runtime/spawn.js" defer></script>
+  <script src="src/systems/runtime/player.js" defer></script>
+  <script src="src/systems/runtime/resource.js" defer></script>
+  <script src="src/systems/runtime/enemy.js" defer></script>
+  <script src="src/systems/runtime/structure.js" defer></script>
+  <script src="src/systems/runtime/particle.js" defer></script>
+  <script src="src/systems/update-systems.js" defer></script>
+  <script src="src/ui/tooltip.js" defer></script>
+  <script src="src/ui/menu.js" defer></script>
+  <script src="src/ui/panels.js" defer></script>
+  <script src="src/ui/interactions.js" defer></script>
+  <script src="src/ui.js" defer></script>
+  <script src="src/render/effects.js" defer></script>
+  <script src="src/render/drawables.js" defer></script>
+  <script src="src/render/scene.js" defer></script>
+  <script src="src/render.js" defer></script>
+  <script src="src/app/input.js" defer></script>
+  <script src="src/app/loop.js" defer></script>
+  <script src="src/app/bootstrap.js" defer></script>
+  <script src="src/main.js" defer></script>
+</body>
+</html>
