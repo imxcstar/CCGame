@@ -71,8 +71,19 @@ canvas {
   top: 18px;
   right: 18px;
   width: min(292px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
+  min-height: 0;
   border-radius: 18px;
+  overflow: hidden;
   pointer-events: auto;
+}
+
+.panel.right > div:last-child {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .brand {
@@ -260,6 +271,9 @@ canvas {
 .craft-list {
   display: grid;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .craft-row {
@@ -570,6 +584,8 @@ button:disabled {
     top: auto;
     right: 12px;
     bottom: 96px;
+    max-height: calc(100vh - 108px);
+    max-height: calc(100dvh - 108px);
   }
 
   .panel.left {
