@@ -26,26 +26,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Prepare site
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      - name: Disable Jekyll
         shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/site"
-          shopt -s dotglob nullglob
-          for item in *; do
-            if [ "$item" = ".git" ] || [ "$item" = ".github" ]; then
-              continue
-            fi
-            cp -R "$item" "$RUNNER_TEMP/site/"
-          done
-          touch "$RUNNER_TEMP/site/.nojekyll"
+        run: touch dist/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ runner.temp }}/site
+          path: ./dist
 
       - name: Deploy to GitHub Pages
         id: deployment
