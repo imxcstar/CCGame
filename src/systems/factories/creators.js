@@ -16,7 +16,15 @@
     addComponent(entityId, 'transform', { x, y });
     addComponent(entityId, 'collider', { radius: 12 });
     addComponent(entityId, 'health', { hp: 100, maxHp: 100, hitTimer: 0 });
-    addComponent(entityId, 'player', { speed: 116, sprint: 180, attackCooldown: 0, hurtTimer: 0 });
+    addComponent(entityId, 'player', {
+      speed: 116,
+      sprint: 180,
+      attackCooldown: 0,
+      hurtTimer: 0,
+      facing: 'down',
+      isMoving: false,
+      animationTime: 0
+    });
     addComponent(entityId, 'survival', { hunger: 100, thirst: 100, energy: 100 });
 
     const inventory = createInventory(16);

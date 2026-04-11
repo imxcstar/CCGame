@@ -30,10 +30,21 @@
   function moveActorEntity(entityId, dx, dy) {
     const transform = getComponent(entityId, 'transform');
     const collider = getComponent(entityId, 'collider');
-    if (!transform || !collider) return;
+    if (!transform || !collider) return { x: 0, y: 0 };
 
-    if (!isBlocked(transform.x + dx, transform.y, collider.radius, entityId)) transform.x += dx;
-    if (!isBlocked(transform.x, transform.y + dy, collider.radius, entityId)) transform.y += dy;
+    let movedX = 0;
+    let movedY = 0;
+
+    if (!isBlocked(transform.x + dx, transform.y, collider.radius, entityId)) {
+      transform.x += dx;
+      movedX = dx;
+    }
+    if (!isBlocked(transform.x, transform.y + dy, collider.radius, entityId)) {
+      transform.y += dy;
+      movedY = dy;
+    }
+
+    return { x: movedX, y: movedY };
   }
 
   Object.assign(game, {

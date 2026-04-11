@@ -18,10 +18,17 @@
     return delta;
   }
 
+  function getFacingDirection(x, y, fallback = 'down') {
+    if (Math.abs(x) < 0.001 && Math.abs(y) < 0.001) return fallback;
+    if (Math.abs(x) > Math.abs(y)) return x > 0 ? 'right' : 'left';
+    return y > 0 ? 'down' : 'up';
+  }
+
   Object.assign(game, {
     clamp,
     lerp,
     dist,
-    angleDelta
+    angleDelta,
+    getFacingDirection
   });
 })(window.TidalIsle);

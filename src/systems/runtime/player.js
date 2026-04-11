@@ -1,5 +1,5 @@
 (function (game) {
-  const { state, dist, moveActorEntity, getStructureIds, getComponent, getPlayerSnapshot, isNight } = game;
+  const { state, dist, moveActorEntity, getStructureIds, getComponent, getPlayerSnapshot, isNight, screenToWorld, getFacingDirection } = game;
 
   function updatePlayerSystem(dt, activeKeys) {
     const player = getPlayerSnapshot();
@@ -23,7 +23,24 @@
       player.survival.energy = Math.min(100, player.survival.energy + dt * 16);
     }
 
-    moveActorEntity(state.playerId, moveX * speed * dt, moveY * speed * dt);
+    const movement = moveActorEntity(state.playerId, moveX * speed * dt, moveY * speed * dt);
+    const movementDistance = Math.hypot(movement.x, movement.y);
+    const hasInput = Math.abs(moveX) > 0.001 || Math.abs(moveY) > 0.001;
+
+    if (hasInput) {
+      const facingX = movementDistance > 0.001 ? movement.x : moveX;
+      const facingY = movementDistance > 0.001 ? movement.y : moveY;
+      player.player.facing = getFacingDirection(facingX, facingY, player.player.facing);
+    } else if (state.pointer.x || state.pointer.y) {
+      const pointerWorld = screenToWorld(state.pointer.x, state.pointer.y);
+      player.player.facing = getFacingDirection(pointerWorld.x - player.transform.x, pointerWorld.y - player.transform.y, player.player.facing);
+    }
+
+    player.player.isMoving = movementDistance > 0.001;
+    if (player.player.isMoving) {
+      const actualSpeed = movementDistance / Math.max(dt, 0.001);
+      player.player.animationTime += dt * actualSpeed * 0.09;
+    }
 
     player.survival.hunger = Math.max(0, player.survival.hunger - dt * 0.22);
     player.survival.thirst = Math.max(0, player.survival.thirst - dt * 0.31);

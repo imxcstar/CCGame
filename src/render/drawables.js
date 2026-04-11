@@ -57,6 +57,85 @@
     drawEnemySprite(enemyId, screen);
   }
 
+  function drawHeldTool(toolKey, angle, yOffset = 0) {
+    ctx.save();
+    ctx.translate(0, yOffset);
+    ctx.rotate(angle);
+    ctx.strokeStyle = '#e6f6ff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    if (toolKey === 'spear') ctx.lineTo(22, -3);
+    else if (toolKey === 'pickaxe') ctx.lineTo(18, 5);
+    else if (toolKey === 'axe') ctx.lineTo(18, 2);
+    else ctx.lineTo(14, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPlayerFrontFrame(bounce, legSwing, armSwing) {
+    ctx.fillStyle = '#80604a';
+    ctx.fillRect(-5, 17 - bounce, 4, 10 + Math.max(0, legSwing));
+    ctx.fillRect(1, 17 - bounce, 4, 10 + Math.max(0, -legSwing));
+    ctx.fillStyle = '#23496b';
+    ctx.fillRect(-10, 4 - bounce + armSwing * 0.35, 3, 11);
+    ctx.fillRect(7, 4 - bounce - armSwing * 0.35, 3, 11);
+    ctx.fillStyle = '#3a6fa2';
+    ctx.fillRect(-8, -1 - bounce, 16, 18);
+    ctx.fillStyle = '#d8cbb3';
+    ctx.beginPath();
+    ctx.arc(0, -9 - bounce, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f6a50';
+    ctx.fillRect(-5, -14 - bounce, 10, 3);
+    ctx.fillStyle = '#fff7f0';
+    ctx.fillRect(-4, -12 - bounce, 2, 2);
+    ctx.fillRect(2, -12 - bounce, 2, 2);
+  }
+
+  function drawPlayerBackFrame(bounce, legSwing, armSwing) {
+    ctx.fillStyle = '#80604a';
+    ctx.fillRect(-5, 17 - bounce, 4, 10 + Math.max(0, legSwing));
+    ctx.fillRect(1, 17 - bounce, 4, 10 + Math.max(0, -legSwing));
+    ctx.fillStyle = '#1f4260';
+    ctx.fillRect(-10, 4 - bounce + armSwing * 0.2, 3, 10);
+    ctx.fillRect(7, 4 - bounce - armSwing * 0.2, 3, 10);
+    ctx.fillStyle = '#315f89';
+    ctx.fillRect(-8, -1 - bounce, 16, 18);
+    ctx.fillStyle = '#1d3c58';
+    ctx.fillRect(-4, 4 - bounce, 8, 7);
+    ctx.fillStyle = '#d8cbb3';
+    ctx.beginPath();
+    ctx.arc(0, -9 - bounce, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f6a50';
+    ctx.fillRect(-5, -7 - bounce, 10, 3);
+  }
+
+  function drawPlayerSideFrame(facing, bounce, legSwing, armSwing) {
+    ctx.save();
+    if (facing === 'left') ctx.scale(-1, 1);
+    ctx.fillStyle = '#80604a';
+    ctx.fillRect(-2, 17 - bounce, 4, 10 + Math.max(0, legSwing));
+    ctx.fillRect(2, 17 - bounce, 4, 10 + Math.max(0, -legSwing));
+    ctx.fillStyle = '#1f4260';
+    ctx.fillRect(-6, 4 - bounce + armSwing * 0.25, 3, 10);
+    ctx.fillStyle = '#3a6fa2';
+    ctx.fillRect(-5, -1 - bounce, 10, 18);
+    ctx.fillStyle = '#d8cbb3';
+    ctx.beginPath();
+    ctx.arc(2, -9 - bounce, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8f6a50';
+    ctx.fillRect(0, -14 - bounce, 7, 3);
+    ctx.fillStyle = '#fff7f0';
+    ctx.fillRect(5, -11 - bounce, 2, 2);
+    ctx.fillStyle = '#23496b';
+    ctx.fillRect(5, 3 - bounce - armSwing * 0.35, 3, 11);
+    ctx.restore();
+  }
+
   function drawPlayer(shakeX, shakeY) {
     const transform = getComponent(state.playerId, 'transform');
     const player = getComponent(state.playerId, 'player');
@@ -65,8 +144,21 @@
     const selected = getSelectedItem();
     const toolKey = selected.item?.toolKey || 'hands';
     const screen = worldToScreen(transform.x, transform.y, shakeX, shakeY);
-    const pointerWorld = screenToWorld(state.pointer.x, state.pointer.y);
-    const angle = Math.atan2(pointerWorld.y - transform.y, pointerWorld.x - transform.x);
+    const hasPointer = state.pointer.x || state.pointer.y;
+    const pointerWorld = hasPointer ? screenToWorld(state.pointer.x, state.pointer.y) : null;
+    const angle = pointerWorld
+      ? Math.atan2(pointerWorld.y - transform.y, pointerWorld.x - transform.x)
+      : player.facing === 'left'
+        ? Math.PI
+        : player.facing === 'up'
+          ? -Math.PI * 0.5
+          : player.facing === 'down'
+            ? Math.PI * 0.5
+            : 0;
+    const walkPhase = player.animationTime || 0;
+    const legSwing = player.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
+    const armSwing = player.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
+    const bounce = player.isMoving ? Math.abs(Math.sin(walkPhase)) * 1.4 : 0;
 
     ctx.save();
     ctx.translate(screen.x, screen.y);
@@ -74,29 +166,22 @@
     ctx.beginPath();
     ctx.ellipse(0, 12, 12, 6, 0, 0, Math.PI * 2);
     ctx.fill();
+
     if (player.hurtTimer > 0) ctx.globalAlpha = 0.74;
-    ctx.fillStyle = '#d8cbb3';
-    ctx.beginPath();
-    ctx.arc(0, -8, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#3a6fa2';
-    ctx.fillRect(-8, 0, 16, 18);
-    ctx.fillStyle = '#23496b';
-    ctx.fillRect(-9, 5, 4, 12);
-    ctx.fillRect(5, 5, 4, 12);
-    ctx.fillStyle = '#80604a';
-    ctx.fillRect(-5, 18, 4, 10);
-    ctx.fillRect(1, 18, 4, 10);
-    ctx.rotate(angle);
-    ctx.strokeStyle = '#e6f6ff';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, 2);
-    if (toolKey === 'spear') ctx.lineTo(22, -3);
-    else if (toolKey === 'pickaxe') ctx.lineTo(18, 5);
-    else if (toolKey === 'axe') ctx.lineTo(18, 2);
-    else ctx.lineTo(14, 0);
-    ctx.stroke();
+    if (player.facing === 'up') {
+      ctx.save();
+      ctx.globalAlpha *= 0.85;
+      drawHeldTool(toolKey, angle, 1 - bounce);
+      ctx.restore();
+      drawPlayerBackFrame(bounce, legSwing, armSwing);
+    } else if (player.facing === 'left' || player.facing === 'right') {
+      drawPlayerSideFrame(player.facing, bounce, legSwing, armSwing);
+      drawHeldTool(toolKey, angle, 1 - bounce);
+    } else {
+      drawPlayerFrontFrame(bounce, legSwing, armSwing);
+      drawHeldTool(toolKey, angle, 1 - bounce);
+    }
+
     ctx.restore();
   }
 
