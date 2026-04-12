@@ -17,10 +17,15 @@
   function getEveningAtmosphere() {
     if (state.time < 0.55 && state.time > 0.18) return null;
 
-    const phase = state.time >= 0.55 ? state.time : state.time + 1;
-    const dusk = smoothstep(0.55, 0.72, phase) * (1 - smoothstep(0.9, 1.06, phase));
-    const night = smoothstep(0.68, 0.88, phase) * (1 - smoothstep(1.02, 1.18, phase));
-    const ember = smoothstep(0.56, 0.74, phase) * (1 - smoothstep(0.78, 0.94, phase));
+    const eveningPhase = state.time;
+    const nightPhase = state.time >= 0.55 ? state.time : state.time + 1;
+    const dusk = state.time >= 0.55
+      ? smoothstep(0.55, 0.69, eveningPhase) * (1 - smoothstep(0.72, 0.8, eveningPhase))
+      : 0;
+    const night = smoothstep(0.68, 0.88, nightPhase) * (1 - smoothstep(1.02, 1.18, nightPhase));
+    const ember = state.time >= 0.55
+      ? smoothstep(0.56, 0.68, eveningPhase) * (1 - smoothstep(0.7, 0.76, eveningPhase))
+      : 0;
 
     return { dusk, night, ember };
   }
