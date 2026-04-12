@@ -19,6 +19,7 @@
     state.time = 0.35;
     state.enemySpawnTimer = 8;
     state.selectedSlot = 0;
+    state.selectedInventoryIndex = null;
     state.over = false;
     state.running = false;
     state.playerId = null;

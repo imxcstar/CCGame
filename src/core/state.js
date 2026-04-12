@@ -9,6 +9,7 @@
     worldAge: 0,
     playerId: null,
     selectedSlot: 0,
+    selectedInventoryIndex: null,
     day: 1,
     time: 0.35,
     enemySpawnTimer: 8,

@@ -3,7 +3,6 @@
     state,
     dom,
     craftButtons,
-    HOTBAR_SIZE,
     CRAFTING_RECIPES,
     ITEM_DEFS,
     clamp,
@@ -13,7 +12,6 @@
     getItemTypeLabel,
     getInventoryUsedSlots,
     getPlayerSnapshot,
-    getHotbarItem,
     getSelectedItem,
     resolveInventoryReference,
     getItemMenuState,
@@ -22,14 +20,6 @@
     getTimeLabel,
     getWeatherText
   } = game;
-
-  function getHotbarLinks(inventory, inventoryIndex) {
-    const links = [];
-    for (let index = 0; index < HOTBAR_SIZE; index++) {
-      if (inventory.hotbar?.[index] === inventoryIndex) links.push(index + 1);
-    }
-    return links;
-  }
 
   function createCraftButtons() {
     dom.craftListEl.innerHTML = '';
@@ -69,8 +59,10 @@
       .join('');
 
     const usedSlots = getInventoryUsedSlots(player.inventory);
-    dom.inventoryEl.innerHTML = `
-      <div class="inventory-meta">已用 ${usedSlots}/${player.inventory.size} · 右键打开物品菜单</div>
+    const selected = getSelectedItem();
+    const selectedIndex = selected?.inventoryIndex;
+    const inventoryMarkup = `
+      <div class="inventory-meta">已用 ${usedSlots}/${player.inventory.size} · 左键切换当前手持 · 右键打开物品菜单</div>
       ${player.inventory.slots
         .map((slot, index) => {
           if (!slot) {
@@ -82,41 +74,27 @@
           }
 
           const item = ITEM_DEFS[slot.key] || { name: slot.key, icon: '•', tint: '#dbe8f0', type: 'material' };
-          const links = getHotbarLinks(player.inventory, index);
+          const classes = ['bag-slot', 'filled', selectedIndex === index ? 'selected' : ''].filter(Boolean).join(' ');
           return `
-            <div class="bag-slot filled" data-slot-source="inventory" data-slot-index="${index}" style="--item-tint:${item.tint}">
+            <div class="${classes}" data-slot-source="inventory" data-slot-index="${index}" style="--item-tint:${item.tint}">
               <span class="bag-slot-index">${index + 1}</span>
               <span class="bag-slot-icon" aria-hidden="true">${item.icon}</span>
               <span class="bag-slot-count">${slot.amount}</span>
-              <span class="bag-slot-links">${links.map((value) => `<em>${value}</em>`).join('')}</span>
             </div>
           `;
         })
         .join('')}
     `;
 
-    const selected = getSelectedItem();
-    dom.hotbarEl.innerHTML = Array.from({ length: HOTBAR_SIZE }, (_, index) => {
-      const actual = getHotbarItem(player.inventory, index);
-      const display = actual || (index === state.selectedSlot ? selected : null);
-      const item = display?.item;
-      const classes = [
-        'slot',
-        index === state.selectedSlot ? 'active' : '',
-        actual ? 'filled' : 'empty',
-        !actual && index === state.selectedSlot ? 'fallback' : ''
-      ]
-        .filter(Boolean)
-        .join(' ');
+    if (dom.inventoryEl._markup !== inventoryMarkup) {
+      dom.inventoryEl.innerHTML = inventoryMarkup;
+      dom.inventoryEl._markup = inventoryMarkup;
+    }
 
-      return `
-        <div class="${classes}" data-slot-source="hotbar" data-slot-index="${index}">
-          <span class="slot-key">${index + 1}</span>
-          <span class="slot-icon" aria-hidden="true">${item?.icon || ''}</span>
-          ${actual && actual.amount > 1 ? `<span class="slot-count">${actual.amount}</span>` : ''}
-        </div>
-      `;
-    }).join('');
+    if (dom.hotbarEl && dom.hotbarEl._markup !== '') {
+      dom.hotbarEl.innerHTML = '';
+      dom.hotbarEl._markup = '';
+    }
 
     for (const [key, button] of craftButtons.entries()) {
       const recipe = CRAFTING_RECIPES[key];

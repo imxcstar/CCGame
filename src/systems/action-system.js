@@ -15,7 +15,9 @@
     burst,
     getSelectedItem,
     getItemConfig,
+    isConsumableItem,
     isBuildableItem,
+    consumeInventorySlot,
     tryPlaceStructure,
     getAttackTarget,
     getEnemyDamage,
@@ -252,8 +254,18 @@
     if (!state.running || state.over) return;
 
     const selected = getSelectedItem();
+    if (!selected.isFallback && isConsumableItem(selected.item)) {
+      consumeInventorySlot(selected.inventoryIndex);
+      return;
+    }
+
     if (!selected.isFallback && isBuildableItem(selected.item)) {
       tryPlaceStructure();
+      return;
+    }
+
+    if (!selected.isFallback && selected.item?.type === 'material') {
+      showMessage(selected.item.name + ' 不能直接使用');
       return;
     }
 

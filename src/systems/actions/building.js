@@ -83,6 +83,10 @@
       return;
     }
 
+    if (!player.inventory.slots[preview.inventoryIndex] && state.selectedInventoryIndex === preview.inventoryIndex) {
+      state.selectedInventoryIndex = null;
+    }
+
     createStructureEntity(preview.kind, preview.x, preview.y);
     burst(preview.x, preview.y, '#83f5ce', 10, 44);
     state.shake = Math.max(state.shake, 2);

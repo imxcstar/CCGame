@@ -3,9 +3,7 @@
 
   function getDisplayReference(source, index) {
     const reference = resolveInventoryReference(source, index);
-    if (reference) return reference;
-    if (source === 'hotbar' && index === state.selectedSlot) return getSelectedItem();
-    return null;
+    return reference || null;
   }
 
   function closeTooltip() {
@@ -28,15 +26,15 @@
     }
 
     const item = reference.item;
-    const location = source === 'hotbar' ? '快捷栏 ' + (index + 1) : '背包格 ' + (index + 1);
+    const location = '背包格 ' + (index + 1);
     const amountText = reference.isFallback ? '默认空手' : '数量 ' + reference.amount;
     const actionText = reference.isFallback
-      ? '当前快捷栏为空时自动使用拳头。'
+      ? '未选中任何物品时默认使用拳头。'
       : item.type === 'consumable'
-        ? '右键可使用或丢弃。'
+        ? '左键选中后可在地图中直接使用，右键也可立即食用。'
         : item.type === 'material'
-          ? '右键可放入快捷栏或丢弃。'
-          : '右键可使用、绑定或丢弃。';
+          ? '左键可选中为当前手持，右键可丢弃。'
+          : '左键选中为当前手持，右键可查看更多操作。';
 
     dom.itemTooltipEl.innerHTML = `
       <div class="item-tooltip-head">

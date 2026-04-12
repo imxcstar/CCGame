@@ -71,10 +71,22 @@
     return null;
   }
 
+  function setSelectedInventoryIndex(index = null) {
+    state.selectedInventoryIndex = Number.isInteger(index) ? index : null;
+    return state.selectedInventoryIndex;
+  }
+
   function getSelectedItem() {
     const inventory = getPlayerComponent('inventory');
     if (!inventory) return getFallbackHandsReference();
-    return getHotbarItem(inventory, state.selectedSlot) || getFallbackHandsReference();
+
+    const selected = Number.isInteger(state.selectedInventoryIndex)
+      ? getInventoryReference(inventory, state.selectedInventoryIndex)
+      : null;
+
+    if (selected) return selected;
+    if (state.selectedInventoryIndex !== null) state.selectedInventoryIndex = null;
+    return getFallbackHandsReference();
   }
 
   Object.assign(game, {
@@ -84,6 +96,7 @@
     clearHotbarSlot,
     getFallbackHandsReference,
     resolveInventoryReference,
+    setSelectedInventoryIndex,
     getSelectedItem
   });
 })(window.TidalIsle);

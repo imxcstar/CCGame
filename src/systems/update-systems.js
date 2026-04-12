@@ -40,7 +40,12 @@
 
     const selected = getSelectedItem();
     if (selected && !selected.isFallback && selected.item?.type === 'buildable') {
-      state.hint = '左键放置 ' + selected.item.name + ' · 滚轮/数字键切换快捷栏';
+      state.hint = '左键放置 ' + selected.item.name + ' · 右键取消手持';
+      return;
+    }
+
+    if (selected && !selected.isFallback && selected.item?.type === 'consumable') {
+      state.hint = '左键直接使用 ' + selected.item.name + ' · 右键取消手持';
       return;
     }
 

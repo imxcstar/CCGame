@@ -16,6 +16,7 @@
     isEquippableItem,
     getInventoryReference,
     resolveInventoryReference,
+    setSelectedInventoryIndex,
     assignInventorySlotToHotbar,
     clearHotbarSlot
   } = game;
@@ -106,6 +107,10 @@
     const removed = removeItemFromInventorySlot(player.inventory, inventoryIndex, 1);
     if (removed <= 0) return false;
 
+    if (!player.inventory.slots[inventoryIndex] && state.selectedInventoryIndex === inventoryIndex) {
+      setSelectedInventoryIndex(null);
+    }
+
     applyConsumableEffect(player, reference.key);
     setScore();
     return true;
@@ -122,6 +127,22 @@
     }
 
     return consumeInventorySlot(slotIndex);
+  }
+
+  function selectItemReference(source, index) {
+    const player = getPlayerSnapshot();
+    const reference = resolveInventoryReference(source, index);
+    if (!player?.inventory || !reference || reference.isFallback) return false;
+
+    if (state.selectedInventoryIndex === reference.inventoryIndex) {
+      setSelectedInventoryIndex(null);
+      showMessage('切换为空手');
+      return true;
+    }
+
+    setSelectedInventoryIndex(reference.inventoryIndex);
+    showMessage('当前手持 ' + getItemConfig(reference.key).name);
+    return true;
   }
 
   function bindItemReference(source, index, hotbarIndex = state.selectedSlot) {
@@ -151,6 +172,10 @@
     const removed = removeItemFromInventorySlot(player.inventory, reference.inventoryIndex, 1);
     if (removed <= 0) return false;
 
+    if (!player.inventory.slots[reference.inventoryIndex] && state.selectedInventoryIndex === reference.inventoryIndex) {
+      setSelectedInventoryIndex(null);
+    }
+
     showMessage('丢弃 1 个 ' + getItemConfig(reference.key).name);
     setScore();
     return true;
@@ -159,9 +184,7 @@
   function useItemReference(source, index) {
     const reference = resolveInventoryReference(source, index);
     if (!reference) {
-      if (source === 'hotbar' && index === state.selectedSlot) {
-        showMessage('当前为空手');
-      }
+      showMessage('当前为空手');
       return false;
     }
 
@@ -170,10 +193,7 @@
     }
 
     if (isEquippableItem(reference.item)) {
-      if (source === 'inventory') return bindItemReference(source, index, state.selectedSlot);
-      state.selectedSlot = index;
-      showMessage('已切换到 ' + reference.item.name);
-      return true;
+      return selectItemReference(source, index);
     }
 
     showMessage(reference.item.name + ' 不能直接使用');
@@ -184,6 +204,7 @@
     craftItem,
     consumeInventorySlot,
     useConsumable,
+    selectItemReference,
     bindItemReference,
     clearHotbarReference,
     dropItemReference,

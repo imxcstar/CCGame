@@ -8,6 +8,7 @@
     openItemMenu,
     closeItemMenu,
     bindContextMenuButtons,
+    selectItemReference,
     showMessage,
     setScore
   } = game;
@@ -40,21 +41,23 @@
       renderTooltip(getDisplayReference(source, index), source, index, event.clientX, event.clientY);
     });
 
-    surface.addEventListener('click', (event) => {
+    surface.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
       const slot = getSlotTarget(event.target);
       if (!slot) return;
       const index = Number(slot.dataset.slotIndex);
 
-      if (source === 'hotbar') {
-        state.selectedSlot = index;
+      if (source === 'inventory') {
+        event.preventDefault();
+        selectItemReference(source, index);
         closeItemMenu();
+        game.updateUI?.();
       }
     });
   }
 
   function bindInventoryUi() {
     bindSlotSurface(dom.inventoryEl, 'inventory');
-    bindSlotSurface(dom.hotbarEl, 'hotbar');
     bindContextMenuButtons();
 
     document.addEventListener('pointerdown', (event) => {

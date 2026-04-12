@@ -4,9 +4,7 @@
     resolveInventoryReference,
     positionFloatingElement,
     useItemReference,
-    bindItemReference,
-    dropItemReference,
-    clearHotbarReference
+    dropItemReference
   } = game;
 
   let menuState = null;
@@ -32,9 +30,10 @@
     const canUse = item.type !== 'material';
 
     dom.itemMenuTitleEl.innerHTML = `<span aria-hidden="true">${item.icon}</span><strong>${item.name}</strong>`;
+    dom.itemMenuUseBtn.textContent = item.type === 'consumable' ? '立即使用' : '设为手持';
     dom.itemMenuUseBtn.disabled = !canUse;
-    dom.itemMenuBindBtn.hidden = source !== 'inventory';
-    dom.itemMenuClearBtn.hidden = source !== 'hotbar';
+    dom.itemMenuBindBtn.hidden = true;
+    dom.itemMenuClearBtn.hidden = true;
     dom.itemMenuEl.classList.add('show');
     positionFloatingElement(dom.itemMenuEl, x, y, 8, 8);
   }
@@ -47,13 +46,6 @@
       game.updateUI();
     });
 
-    dom.itemMenuBindBtn.addEventListener('click', () => {
-      if (!menuState) return;
-      bindItemReference(menuState.source, menuState.index);
-      closeItemMenu();
-      game.updateUI();
-    });
-
     dom.itemMenuDropBtn.addEventListener('click', () => {
       if (!menuState) return;
       dropItemReference(menuState.source, menuState.index);
@@ -61,12 +53,6 @@
       game.updateUI();
     });
 
-    dom.itemMenuClearBtn.addEventListener('click', () => {
-      if (!menuState) return;
-      clearHotbarReference(menuState.index);
-      closeItemMenu();
-      game.updateUI();
-    });
   }
 
   Object.assign(game, {
