@@ -20,6 +20,7 @@
     state.enemySpawnTimer = 8;
     state.selectedSlot = 0;
     state.selectedInventoryIndex = null;
+    state.selectedWorldTarget = null;
     state.over = false;
     state.running = false;
     state.playerId = null;

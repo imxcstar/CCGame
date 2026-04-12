@@ -9,6 +9,7 @@
     closeItemMenu,
     bindContextMenuButtons,
     selectItemReference,
+    runSelectedWorldTargetAction,
     showMessage,
     setScore
   } = game;
@@ -59,6 +60,13 @@
   function bindInventoryUi() {
     bindSlotSurface(dom.inventoryEl, 'inventory');
     bindContextMenuButtons();
+
+    dom.worldTargetPanelEl?.addEventListener('click', (event) => {
+      const button = event.target.closest?.('[data-world-action]');
+      if (!button) return;
+      runSelectedWorldTargetAction?.(button.dataset.worldAction);
+      game.updateUI?.();
+    });
 
     document.addEventListener('pointerdown', (event) => {
       if (dom.itemMenuEl.contains(event.target)) return;

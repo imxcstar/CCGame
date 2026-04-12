@@ -430,6 +430,68 @@ button:disabled {
   font-size: 13px;
 }
 
+.world-target-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 12;
+  width: min(620px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(187, 226, 255, 0.14);
+  background: rgba(7, 16, 29, 0.9);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.world-target-panel.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.world-target-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.world-target-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.world-target-type,
+.world-target-meta,
+.world-target-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.world-target-desc {
+  line-height: 1.6;
+  color: #d7eaf7;
+}
+
+.world-target-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.world-target-actions button {
+  flex: 0 0 auto;
+  min-width: 96px;
+  text-align: center;
+}
+
 .minimap-card {
   display: grid;
   gap: 8px;

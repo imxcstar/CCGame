@@ -10,6 +10,7 @@
     playerId: null,
     selectedSlot: 0,
     selectedInventoryIndex: null,
+    selectedWorldTarget: null,
     day: 1,
     time: 0.35,
     enemySpawnTimer: 8,

@@ -17,6 +17,7 @@
     getInventoryReference,
     resolveInventoryReference,
     setSelectedInventoryIndex,
+    clearSelectedWorldTarget,
     assignInventorySlotToHotbar,
     clearHotbarSlot
   } = game;
@@ -140,6 +141,7 @@
       return true;
     }
 
+    clearSelectedWorldTarget?.();
     setSelectedInventoryIndex(reference.inventoryIndex);
     showMessage('当前手持 ' + getItemConfig(reference.key).name);
     return true;

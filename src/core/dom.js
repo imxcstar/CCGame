@@ -14,6 +14,7 @@
     hintEl: document.getElementById('hint'),
     minimapEl: document.getElementById('minimap'),
     minimapInfoEl: document.getElementById('minimapInfo'),
+    worldTargetPanelEl: document.getElementById('worldTargetPanel'),
     startOverlay: document.getElementById('startOverlay'),
     gameOverOverlay: document.getElementById('gameOverOverlay'),
     gameOverText: document.getElementById('gameOverText'),

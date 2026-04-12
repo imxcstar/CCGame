@@ -17,6 +17,7 @@
     getItemMenuState,
     closeItemMenu,
     craftItem,
+    getSelectedWorldTargetInfo,
     getTimeLabel,
     getWeatherText
   } = game;
@@ -136,6 +137,41 @@
     }
     dom.messageEl.textContent = state.message;
     dom.hintEl.textContent = state.hint;
+
+    if (dom.worldTargetPanelEl) {
+      const targetInfo = getSelectedWorldTargetInfo?.();
+      if (!targetInfo) {
+        dom.worldTargetPanelEl.classList.remove('show');
+        if (dom.worldTargetPanelEl._markup !== '') {
+          dom.worldTargetPanelEl.innerHTML = '';
+          dom.worldTargetPanelEl._markup = '';
+        }
+      } else {
+        const markup = `
+          <div class="world-target-head">
+            <div>
+              <div class="world-target-name">${targetInfo.name}</div>
+              <div class="world-target-type">${targetInfo.typeLabel}</div>
+            </div>
+            <div class="world-target-meta">${targetInfo.meta}</div>
+          </div>
+          <div class="world-target-desc">${targetInfo.description}</div>
+          <div class="world-target-actions">
+            ${targetInfo.actions
+              .map(
+                (action) => `<button type="button" data-world-action="${action.id}" ${action.disabled ? 'disabled' : ''}>${action.label}</button>`
+              )
+              .join('')}
+          </div>
+        `;
+
+        if (dom.worldTargetPanelEl._markup !== markup) {
+          dom.worldTargetPanelEl.innerHTML = markup;
+          dom.worldTargetPanelEl._markup = markup;
+        }
+        dom.worldTargetPanelEl.classList.add('show');
+      }
+    }
 
     const menuState = getItemMenuState();
     if (menuState && !resolveInventoryReference(menuState.source, menuState.index)) {

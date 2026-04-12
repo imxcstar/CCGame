@@ -73,6 +73,16 @@
       return;
     }
 
+    if (selected?.isFallback && state.selectedWorldTarget) {
+      state.hint = '空手时左键选中目标，底部面板可执行采集/攻击/拆卸';
+      return;
+    }
+
+    if (selected?.isFallback) {
+      state.hint = '空手时左键可选中地图目标，底部面板显示可执行操作';
+      return;
+    }
+
     if (isNight()) {
       state.hint = '夜幕已降临：靠近篝火恢复，长矛更适合战斗';
       return;

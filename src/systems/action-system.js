@@ -1,6 +1,7 @@
 (function (game) {
   const {
     TILE,
+    ATTACK_RANGE,
     state,
     dist,
     countInventoryItem,
@@ -12,9 +13,14 @@
     getComponent,
     getPlayerSnapshot,
     getStructureIds,
+    getResourceIds,
+    getEnemyIds,
     burst,
     getSelectedItem,
     getItemConfig,
+    getStructureConfig,
+    getEntityConfig,
+    getEnemyConfig,
     isConsumableItem,
     isBuildableItem,
     consumeInventorySlot,
@@ -28,8 +34,21 @@
     tileAtWorld,
     randomBetween,
     randomInt,
-    isNight
+    isNight,
+    removeChunkStructureEntity,
+    destroyEntity
   } = game;
+
+  const RESOURCE_DISPLAY = {
+    tree: { name: '树木', description: '可以采集木材，石斧会更高效。' },
+    palm: { name: '棕榈树', description: '可以采集木材和椰子。' },
+    rock: { name: '岩石', description: '可以采集石块，石镐会更高效。' },
+    bush: { name: '灌木', description: '可以采集纤维和浆果。' }
+  };
+
+  const ENEMY_DISPLAY = {
+    crawler: { name: '暗潮爬行者', description: '夜晚会主动追击你，长矛对它更有效。' }
+  };
 
   function getActiveToolKey() {
     const selected = getSelectedItem();
@@ -188,6 +207,332 @@
     showMessage('鱼跑掉了');
   }
 
+  function clearSelectedWorldTarget() {
+    state.selectedWorldTarget = null;
+  }
+
+  function getWorldTargetAtPointer() {
+    const pointerWorld = screenToWorld(state.pointer.x, state.pointer.y);
+    let best = null;
+    let bestScore = Infinity;
+
+    for (const structureId of getStructureIds()) {
+      const transform = getComponent(structureId, 'transform');
+      const structure = getComponent(structureId, 'structure');
+      if (!transform || !structure) continue;
+
+      const config = getStructureConfig(structure.kind);
+      const radius = Math.max(18, (config?.collisionRadius || config?.radius || 14) + 10);
+      const distance = dist(pointerWorld.x, pointerWorld.y, transform.x, transform.y);
+      if (distance > radius) continue;
+
+      const score = distance;
+      if (score < bestScore) {
+        best = { group: 'structure', id: structureId };
+        bestScore = score;
+      }
+    }
+
+    for (const entityId of getResourceIds()) {
+      const transform = getComponent(entityId, 'transform');
+      const collider = getComponent(entityId, 'collider');
+      const resourceNode = getComponent(entityId, 'resourceNode');
+      if (!transform || !collider || !resourceNode?.alive) continue;
+
+      const distance = dist(pointerWorld.x, pointerWorld.y, transform.x, transform.y);
+      if (distance > collider.radius + 12) continue;
+
+      const score = distance + 2;
+      if (score < bestScore) {
+        best = { group: 'resource', id: entityId };
+        bestScore = score;
+      }
+    }
+
+    for (const enemyId of getEnemyIds()) {
+      const transform = getComponent(enemyId, 'transform');
+      const collider = getComponent(enemyId, 'collider');
+      if (!transform || !collider) continue;
+
+      const distance = dist(pointerWorld.x, pointerWorld.y, transform.x, transform.y);
+      if (distance > collider.radius + 14) continue;
+
+      const score = distance + 4;
+      if (score < bestScore) {
+        best = { group: 'enemy', id: enemyId };
+        bestScore = score;
+      }
+    }
+
+    return best;
+  }
+
+  function selectWorldTargetAtPointer() {
+    const target = getWorldTargetAtPointer();
+    state.selectedWorldTarget = target ? { group: target.group, id: target.id } : null;
+    return target;
+  }
+
+  function getSelectedWorldTarget() {
+    const target = state.selectedWorldTarget;
+    if (!target?.id || !target.group) return null;
+
+    const transform = getComponent(target.id, 'transform');
+    const health = getComponent(target.id, 'health');
+    if (!transform) {
+      clearSelectedWorldTarget();
+      return null;
+    }
+
+    if (target.group === 'structure') {
+      const structure = getComponent(target.id, 'structure');
+      if (!structure || !health) {
+        clearSelectedWorldTarget();
+        return null;
+      }
+      return { ...target, transform, health, structure };
+    }
+
+    if (target.group === 'resource') {
+      const resourceNode = getComponent(target.id, 'resourceNode');
+      const collider = getComponent(target.id, 'collider');
+      if (!resourceNode?.alive || !collider || !health) {
+        clearSelectedWorldTarget();
+        return null;
+      }
+      return { ...target, transform, health, collider, resourceNode };
+    }
+
+    if (target.group === 'enemy') {
+      const enemy = getComponent(target.id, 'enemy');
+      const collider = getComponent(target.id, 'collider');
+      if (!enemy || !collider || !health) {
+        clearSelectedWorldTarget();
+        return null;
+      }
+      return { ...target, transform, health, collider, enemy };
+    }
+
+    clearSelectedWorldTarget();
+    return null;
+  }
+
+  function getDistanceToTarget(target) {
+    const player = getPlayerSnapshot();
+    if (!player?.transform || !target?.transform) return Infinity;
+    return dist(player.transform.x, player.transform.y, target.transform.x, target.transform.y);
+  }
+
+  function interactWithStructure(structureId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    if (!player?.inventory || !player.survival || !transform || !structure) return false;
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) >= 62) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if (structure.kind === 'campfire') {
+      if (countInventoryItem(player.inventory, 'wood') <= 0) {
+        showMessage('缺少木材');
+        return false;
+      }
+
+      removeItemFromInventory(player.inventory, 'wood', 1);
+      structure.fuel = Math.min(120, (structure.fuel || 0) + 28);
+      burst(transform.x, transform.y, '#ffca74', 6, 28);
+      showMessage('篝火添柴 +1');
+      setScore();
+      return true;
+    }
+
+    if (structure.kind === 'collector') {
+      if ((structure.water || 0) <= 0) {
+        showMessage('雨水收集器还没有水');
+        return false;
+      }
+
+      structure.water -= 1;
+      player.survival.thirst = Math.min(100, player.survival.thirst + 34);
+      player.survival.energy = Math.min(100, player.survival.energy + 6);
+      burst(transform.x, transform.y, '#81e7ff', 7, 30);
+      showMessage('取水成功');
+      return true;
+    }
+
+    showMessage('这个结构没有可执行操作');
+    return false;
+  }
+
+  function dismantleStructure(structureId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    const item = getItemConfig(structure?.kind);
+    if (!player?.inventory || !transform || !structure || !item) return false;
+
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) > 82) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if (!canStoreAllItems(player.inventory, { [structure.kind]: 1 })) {
+      showMessage('背包空间不足');
+      return false;
+    }
+
+    removeChunkStructureEntity?.(structureId);
+    destroyEntity(structureId);
+    addInventory({ [structure.kind]: 1 });
+    burst(transform.x, transform.y, '#83f5ce', 10, 42);
+    clearSelectedWorldTarget();
+    setScore();
+    showMessage('已拆卸 ' + (getStructureConfig(structure.kind)?.name || item.name));
+    return true;
+  }
+
+  function attackResourceWithHands(resourceId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(resourceId, 'transform');
+    const health = getComponent(resourceId, 'health');
+    const collider = getComponent(resourceId, 'collider');
+    const resourceNode = getComponent(resourceId, 'resourceNode');
+    if (!player?.transform || !player.player || !transform || !health || !collider || !resourceNode?.alive) return false;
+
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) > ATTACK_RANGE + collider.radius) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if (player.player.attackCooldown > 0) return false;
+
+    player.player.attackCooldown = 0.26;
+    burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
+    state.shake = Math.max(state.shake, 4);
+    health.hp -= getResourceDamage('hands', resourceId);
+    health.hitTimer = 0.18;
+    if (health.hp <= 0) {
+      harvestResource(resourceId);
+      clearSelectedWorldTarget();
+    }
+    return true;
+  }
+
+  function attackEnemyWithHands(enemyId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(enemyId, 'transform');
+    const collider = getComponent(enemyId, 'collider');
+    const enemy = getComponent(enemyId, 'enemy');
+    if (!player?.transform || !player.player || !transform || !collider || !enemy) return false;
+
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) > ATTACK_RANGE + collider.radius) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if (player.player.attackCooldown > 0) return false;
+
+    player.player.attackCooldown = 0.26;
+    burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
+    state.shake = Math.max(state.shake, 4);
+    hitEnemy(enemyId, getEnemyDamage('hands', enemyId));
+    if (!getComponent(enemyId, 'enemy')) clearSelectedWorldTarget();
+    return true;
+  }
+
+  function getSelectedWorldTargetInfo() {
+    const selected = getSelectedItem();
+    if (!selected?.isFallback) return null;
+
+    const target = getSelectedWorldTarget();
+    const player = getPlayerSnapshot();
+    if (!target || !player?.inventory) return null;
+
+    const distance = getDistanceToTarget(target);
+
+    if (target.group === 'structure') {
+      const config = getStructureConfig(target.structure.kind);
+      const item = getItemConfig(target.structure.kind);
+      const actions = [];
+      const near = distance <= 62;
+
+      if (target.structure.kind === 'campfire') {
+        const hasWood = countInventoryItem(player.inventory, 'wood') > 0;
+        actions.push({ id: 'interact', label: hasWood ? '添柴' : '缺少木材', disabled: !near || !hasWood });
+      }
+
+      if (target.structure.kind === 'collector') {
+        const hasWater = (target.structure.water || 0) > 0;
+        actions.push({ id: 'interact', label: hasWater ? '取水' : '暂无储水', disabled: !near || !hasWater });
+      }
+
+      actions.push({
+        id: 'dismantle',
+        label: !canStoreAllItems(player.inventory, { [target.structure.kind]: 1 }) ? '背包已满' : '拆卸',
+        disabled: distance > 82 || !canStoreAllItems(player.inventory, { [target.structure.kind]: 1 })
+      });
+
+      const metaParts = [
+        '距离 ' + Math.round(distance),
+        '耐久 ' + Math.ceil(target.health.hp) + '/' + Math.ceil(target.health.maxHp)
+      ];
+      if (target.structure.kind === 'campfire') metaParts.push('燃料 ' + Math.ceil(target.structure.fuel || 0));
+      if (target.structure.kind === 'collector') metaParts.push('储水 ' + Math.ceil(target.structure.water || 0));
+
+      return {
+        name: config?.name || item.name,
+        typeLabel: '建筑',
+        meta: metaParts.join(' · '),
+        description: item.description || '可以交互或拆卸的营地结构。',
+        actions
+      };
+    }
+
+    if (target.group === 'resource') {
+      const display = RESOURCE_DISPLAY[target.resourceNode.kind] || { name: target.resourceNode.kind, description: '可采集资源。' };
+      return {
+        name: display.name,
+        typeLabel: '资源',
+        meta: '距离 ' + Math.round(distance) + ' · 储量 ' + Math.max(0, Math.ceil(target.health.hp)),
+        description: display.description,
+        actions: [{ id: 'gather', label: '采集', disabled: distance > ATTACK_RANGE + target.collider.radius || player.player?.attackCooldown > 0 }]
+      };
+    }
+
+    const enemyDisplay = ENEMY_DISPLAY[target.enemy.kind] || { name: target.enemy.kind, description: '危险生物。' };
+    return {
+      name: enemyDisplay.name,
+      typeLabel: '敌人',
+      meta: '距离 ' + Math.round(distance) + ' · 生命 ' + Math.max(0, Math.ceil(target.health.hp)),
+      description: enemyDisplay.description,
+      actions: [{ id: 'attack', label: '攻击', disabled: distance > ATTACK_RANGE + target.collider.radius || player.player?.attackCooldown > 0 }]
+    };
+  }
+
+  function runSelectedWorldTargetAction(actionId) {
+    const target = getSelectedWorldTarget();
+    if (!target) return false;
+
+    if (target.group === 'structure') {
+      if (actionId === 'interact') return interactWithStructure(target.id);
+      if (actionId === 'dismantle') return dismantleStructure(target.id);
+      return false;
+    }
+
+    if (target.group === 'resource') {
+      if (actionId === 'gather') return attackResourceWithHands(target.id);
+      return false;
+    }
+
+    if (target.group === 'enemy') {
+      if (actionId === 'attack') return attackEnemyWithHands(target.id);
+      return false;
+    }
+
+    return false;
+  }
+
   function interact() {
     if (!state.running || state.over) return;
 
@@ -208,27 +553,7 @@
       });
 
     for (const structureId of candidates) {
-      const transform = getComponent(structureId, 'transform');
-      const structure = getComponent(structureId, 'structure');
-      if (!transform || !structure) continue;
-
-      if (structure.kind === 'campfire' && countInventoryItem(player.inventory, 'wood') > 0) {
-        removeItemFromInventory(player.inventory, 'wood', 1);
-        structure.fuel = Math.min(120, (structure.fuel || 0) + 28);
-        burst(transform.x, transform.y, '#ffca74', 6, 28);
-        showMessage('篝火添柴 +1');
-        setScore();
-        return;
-      }
-
-      if (structure.kind === 'collector' && (structure.water || 0) > 0) {
-        structure.water -= 1;
-        player.survival.thirst = Math.min(100, player.survival.thirst + 34);
-        player.survival.energy = Math.min(100, player.survival.energy + 6);
-        burst(transform.x, transform.y, '#81e7ff', 7, 30);
-        showMessage('取水成功');
-        return;
-      }
+      if (interactWithStructure(structureId)) return;
     }
 
     showMessage('附近没有可交互目标');
@@ -254,6 +579,11 @@
     if (!state.running || state.over) return;
 
     const selected = getSelectedItem();
+    if (selected.isFallback) {
+      selectWorldTargetAtPointer();
+      return;
+    }
+
     if (!selected.isFallback && isConsumableItem(selected.item)) {
       consumeInventorySlot(selected.inventoryIndex);
       return;
@@ -307,6 +637,11 @@
     primaryAction,
     cancelFishing,
     getFishingTarget,
-    updateFishingSystem
+    updateFishingSystem,
+    clearSelectedWorldTarget,
+    selectWorldTargetAtPointer,
+    getSelectedWorldTarget,
+    getSelectedWorldTargetInfo,
+    runSelectedWorldTargetAction
   });
 })(window.TidalIsle);
