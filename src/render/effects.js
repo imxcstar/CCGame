@@ -96,9 +96,11 @@
       const screen = worldToScreen(light.x, light.y);
       const coreRadius = light.core ?? Math.max(14, light.radius * 0.12);
       const strength = clamp(light.strength ?? 0.72, 0, 1);
-      const gradient = lightCtx.createRadialGradient(screen.x, screen.y, coreRadius, screen.x, screen.y, light.radius);
+      const coreRatio = clamp(coreRadius / light.radius, 0.08, 0.72);
+      const gradient = lightCtx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, light.radius);
       gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      gradient.addColorStop(0.28, `rgba(0, 0, 0, ${strength})`);
+      gradient.addColorStop(coreRatio, `rgba(0, 0, 0, ${strength})`);
+      gradient.addColorStop(0.72, `rgba(0, 0, 0, ${strength * 0.26})`);
       gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       lightCtx.fillStyle = gradient;
       lightCtx.beginPath();
