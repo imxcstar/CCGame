@@ -150,6 +150,12 @@
     dom.dayInfoEl.textContent = `第 ${state.day} 天 · ${getTimeLabel()}`;
     dom.weatherInfoEl.textContent = getWeatherText();
     dom.scoreInfoEl.textContent = '生存评分 ' + state.score;
+    if (dom.minimapInfoEl) {
+      const islandCount = Math.max(1, state.mapMeta?.islandCount || 0);
+      const loadedChunks = state.mapMeta?.loadedChunks || 0;
+      const queuedChunks = state.mapMeta?.queuedChunks || 0;
+      dom.minimapInfoEl.textContent = `群岛 ${islandCount} · 区块 ${loadedChunks}${queuedChunks > 0 ? ` (+${queuedChunks})` : ''}`;
+    }
     dom.messageEl.textContent = state.message;
     dom.hintEl.textContent = state.hint;
 

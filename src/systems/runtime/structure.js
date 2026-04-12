@@ -1,5 +1,5 @@
 (function (game) {
-  const { getStructureIds, getComponent, randomBetween, burst, destroyEntity, spawnParticleEntity, isNight } = game;
+  const { getStructureIds, getComponent, randomBetween, burst, destroyEntity, spawnParticleEntity, isNight, removeChunkStructureEntity } = game;
 
   function updateStructureSystem(dt) {
     for (const structureId of [...getStructureIds()]) {
@@ -35,6 +35,7 @@
 
       if (health.hp <= 0) {
         burst(transform.x, transform.y, '#d5b287', 12, 55);
+        removeChunkStructureEntity?.(structureId);
         destroyEntity(structureId);
       }
     }

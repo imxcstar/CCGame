@@ -36,7 +36,7 @@
 
   function tileAt(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= WORLD_SIZE || ty >= WORLD_SIZE) return 'deep';
-    return state.world[ty][tx];
+    return typeof game.getGeneratedTile === 'function' ? game.getGeneratedTile(tx, ty) : 'deep';
   }
 
   function tileAtWorld(x, y) {

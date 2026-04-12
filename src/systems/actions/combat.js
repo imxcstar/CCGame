@@ -10,6 +10,7 @@
     addInventory,
     getComponent,
     destroyEntity,
+    removeChunkEnemyEntity,
     getEntityConfig,
     getEnemyConfig,
     getPlayerSnapshot,
@@ -40,6 +41,7 @@
       else showMessage('背包已满，没能带走熟肉');
     }
     setScore();
+    removeChunkEnemyEntity?.(entityId);
     destroyEntity(entityId);
   }
 

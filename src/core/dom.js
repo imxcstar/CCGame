@@ -12,6 +12,8 @@
     scoreInfoEl: document.getElementById('scoreInfo'),
     messageEl: document.getElementById('message'),
     hintEl: document.getElementById('hint'),
+    minimapEl: document.getElementById('minimap'),
+    minimapInfoEl: document.getElementById('minimapInfo'),
     startOverlay: document.getElementById('startOverlay'),
     gameOverOverlay: document.getElementById('gameOverOverlay'),
     gameOverText: document.getElementById('gameOverText'),

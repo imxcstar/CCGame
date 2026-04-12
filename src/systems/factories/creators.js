@@ -40,36 +40,58 @@
     return entityId;
   }
 
-  function createResourceEntity(kind, x, y) {
+  function createResourceEntity(kind, x, y, options = {}) {
     const config = getEntityConfig(kind);
     if (!config) return null;
 
+    const alive = options.alive !== false;
+    const hp = options.hp ?? (alive ? config.hp : 0);
     const entityId = createEntity(kind);
     addComponent(entityId, 'transform', { x, y });
     addComponent(entityId, 'collider', { radius: config.radius });
-    addComponent(entityId, 'health', { hp: config.hp, maxHp: config.hp, hitTimer: 0 });
-    addComponent(entityId, 'resourceNode', { kind, alive: true, respawnTimer: 0 });
+    addComponent(entityId, 'health', { hp, maxHp: config.hp, hitTimer: 0 });
+    addComponent(entityId, 'resourceNode', {
+      kind,
+      alive,
+      respawnTimer: options.respawnTimer || 0,
+      chunkKey: options.chunkKey || null,
+      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1,
+      respawnAt: options.respawnAt || 0
+    });
     return entityId;
   }
 
-  function createStructureEntity(kind, x, y) {
+  function createStructureEntity(kind, x, y, options = {}) {
     const config = getStructureConfig(kind);
     if (!config) return null;
 
     const entityId = createEntity(kind);
     addComponent(entityId, 'transform', { x, y });
     addComponent(entityId, 'collider', { radius: config.radius || 0 });
-    addComponent(entityId, 'health', { hp: config.hp, maxHp: config.hp, hitTimer: 0 });
-    addComponent(entityId, 'structure', { kind, ...(config.initialState?.() || {}) });
+    addComponent(entityId, 'health', {
+      hp: options.hp ?? config.hp,
+      maxHp: config.hp,
+      hitTimer: 0
+    });
+    addComponent(entityId, 'structure', {
+      kind,
+      ...(config.initialState?.() || {}),
+      ...(options.state || {}),
+      chunkKey: options.chunkKey || null,
+      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1
+    });
+    if (!Number.isInteger(options.slotIndex) && typeof game.registerChunkStructureEntity === 'function') {
+      game.registerChunkStructureEntity(entityId);
+    }
     return entityId;
   }
 
-  function createEnemyEntity(kind, x, y) {
+  function createEnemyEntity(kind, x, y, options = {}) {
     const config = getEnemyConfig(kind);
     if (!config) return null;
 
-    const hp = config.baseHp + state.day * config.hpPerDay;
-    const speed = config.speedBase + Math.min(24, state.day * config.speedPerDay);
+    const hp = options.hp ?? (config.baseHp + state.day * config.hpPerDay);
+    const speed = options.speed ?? (config.speedBase + Math.min(24, state.day * config.speedPerDay));
     const entityId = createEntity(kind);
     addComponent(entityId, 'transform', { x, y });
     addComponent(entityId, 'collider', { radius: config.radius });
@@ -77,10 +99,15 @@
     addComponent(entityId, 'enemy', {
       kind,
       speed,
-      cooldown: 0,
-      wanderAngle: Math.random() * Math.PI * 2,
-      wanderTime: randomBetween(1.2, 3.6)
+      cooldown: options.cooldown ?? 0,
+      wanderAngle: options.wanderAngle ?? Math.random() * Math.PI * 2,
+      wanderTime: options.wanderTime ?? randomBetween(1.2, 3.6),
+      chunkKey: options.chunkKey || null,
+      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1
     });
+    if (!Number.isInteger(options.slotIndex) && typeof game.registerChunkEnemyEntity === 'function') {
+      game.registerChunkEnemyEntity(entityId);
+    }
     return entityId;
   }
 

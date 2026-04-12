@@ -22,6 +22,8 @@
     state.over = false;
     state.running = false;
     state.playerId = null;
+    state.world = null;
+    state.worldAge = 0;
     state.message = '';
     state.messageTimer = 0;
     state.hint = '';
@@ -38,6 +40,13 @@
       reelWindow: 0,
       ripple: 0,
       animationTime: 0
+    };
+    state.mapMeta = {
+      islandCount: 0,
+      islands: [],
+      loadedChunks: 0,
+      queuedChunks: 0,
+      minimapDirty: true
     };
 
     const spawn = createWorld();
@@ -62,6 +71,7 @@
   function update(dt, activeKeys) {
     if (!state.playerId) return;
 
+    state.worldAge += dt;
     state.time += dt / DAY_LENGTH;
     if (state.time >= 1) {
       state.time -= 1;
@@ -70,6 +80,7 @@
     }
 
     game.updatePlayerSystem?.(dt, activeKeys);
+    game.updateChunkStreamingSystem?.(dt);
     game.updateFishingSystem?.(dt);
     game.updateResourceRespawnSystem?.(dt);
     game.updateEnemySystem?.(dt);

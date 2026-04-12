@@ -5,6 +5,7 @@
     randomBetween,
     getComponent,
     destroyEntity,
+    removeChunkStructureEntity,
     getEnemyConfig,
     getPlayerSnapshot,
     getStructureIds,
@@ -77,6 +78,7 @@
           wallHealth.hp -= dt * 5.5;
           if (wallHealth.hp <= 0) {
             burst(wallTransform.x, wallTransform.y, '#d5b287', 12, 55);
+            removeChunkStructureEntity?.(wallId);
             destroyEntity(wallId);
           }
         }

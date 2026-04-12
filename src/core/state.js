@@ -5,7 +5,8 @@
     running: false,
     over: false,
     seed: 0,
-    world: [],
+    world: null,
+    worldAge: 0,
     playerId: null,
     selectedSlot: 0,
     day: 1,
@@ -29,6 +30,13 @@
       reelWindow: 0,
       ripple: 0,
       animationTime: 0
+    },
+    mapMeta: {
+      islandCount: 0,
+      islands: [],
+      loadedChunks: 0,
+      queuedChunks: 0,
+      minimapDirty: true
     }
   };
 
