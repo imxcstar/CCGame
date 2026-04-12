@@ -28,6 +28,17 @@
     state.score = 0;
     state.shake = 0;
     state.lastTimestamp = 0;
+    state.fishing = {
+      active: false,
+      phase: 'idle',
+      x: 0,
+      y: 0,
+      tile: '',
+      waitTimer: 0,
+      reelWindow: 0,
+      ripple: 0,
+      animationTime: 0
+    };
 
     const spawn = createWorld();
     state.playerId = createPlayerEntity(spawn.x, spawn.y);
@@ -43,6 +54,7 @@
   function endGame() {
     state.over = true;
     state.running = false;
+    if (state.fishing) state.fishing.active = false;
     dom.gameOverText.textContent = `你撑到了第 ${state.day} 天 ${getTimeLabel()}，最终评分 ${state.score}。重新整理营地，再试一次。`;
     dom.gameOverOverlay.classList.add('show');
   }
@@ -58,6 +70,7 @@
     }
 
     game.updatePlayerSystem?.(dt, activeKeys);
+    game.updateFishingSystem?.(dt);
     game.updateResourceRespawnSystem?.(dt);
     game.updateEnemySystem?.(dt);
     game.updateStructureSystem?.(dt);

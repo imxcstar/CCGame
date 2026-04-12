@@ -1,5 +1,5 @@
 (function (game) {
-  const { state, dist, moveActorEntity, getStructureIds, getComponent, getPlayerSnapshot, isNight, screenToWorld, getFacingDirection } = game;
+  const { state, dist, moveActorEntity, getStructureIds, getComponent, getPlayerSnapshot, getSelectedItem, isNight, screenToWorld, getFacingDirection } = game;
 
   function updatePlayerSystem(dt, activeKeys) {
     const player = getPlayerSnapshot();
@@ -31,6 +31,8 @@
       const facingX = movementDistance > 0.001 ? movement.x : moveX;
       const facingY = movementDistance > 0.001 ? movement.y : moveY;
       player.player.facing = getFacingDirection(facingX, facingY, player.player.facing);
+    } else if (state.fishing?.active && getSelectedItem()?.item?.toolKey === 'fishingRod') {
+      player.player.facing = getFacingDirection(state.fishing.x - player.transform.x, state.fishing.y - player.transform.y, player.player.facing);
     } else if (state.pointer.x || state.pointer.y) {
       const pointerWorld = screenToWorld(state.pointer.x, state.pointer.y);
       player.player.facing = getFacingDirection(pointerWorld.x - player.transform.x, pointerWorld.y - player.transform.y, player.player.facing);

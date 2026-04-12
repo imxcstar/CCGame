@@ -7,6 +7,8 @@
     getComponent,
     getStructureHintText,
     getSelectedItem,
+    screenToWorld,
+    tileAtWorld,
     isNight
   } = game;
 
@@ -39,6 +41,30 @@
     const selected = getSelectedItem();
     if (selected && !selected.isFallback && selected.item?.type === 'buildable') {
       state.hint = '左键放置 ' + selected.item.name + ' · 滚轮/数字键切换快捷栏';
+      return;
+    }
+
+    if (selected?.item?.toolKey === 'fishingRod') {
+      if (state.fishing?.active && state.fishing.phase === 'bite') {
+        state.hint = '鱼儿上钩了：左键立刻收竿';
+        return;
+      }
+
+      if (state.fishing?.active) {
+        state.hint = '等待咬钩中 · 离浮标太远会自动收线';
+        return;
+      }
+
+      if (state.pointer.x || state.pointer.y) {
+        const pointerWorld = screenToWorld(state.pointer.x, state.pointer.y);
+        const tile = tileAtWorld(pointerWorld.x, pointerWorld.y);
+        if ((tile === 'water' || tile === 'deep') && dist(player.transform.x, player.transform.y, pointerWorld.x, pointerWorld.y) <= 108) {
+          state.hint = '左键抛竿 · 浮标下沉时再左键收竿';
+          return;
+        }
+      }
+
+      state.hint = '把准星移到近处水面后左键抛竿';
       return;
     }
 

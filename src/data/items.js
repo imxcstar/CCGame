@@ -93,6 +93,39 @@
       description: '更适合对抗夜晚的爬行生物。',
       toolKey: 'spear'
     },
+    fishingRod: {
+      name: '鱼竿',
+      type: 'tool',
+      icon: '🎣',
+      stack: 1,
+      tint: '#8fd9ff',
+      description: '对准近处水面抛竿，浮标下沉时再收线。',
+      toolKey: 'fishingRod'
+    },
+    sardine: {
+      name: '沙丁鱼',
+      type: 'consumable',
+      icon: '🐟',
+      stack: 10,
+      tint: '#a9d8ff',
+      description: '小巧的海鱼，能恢复一些饥饿。'
+    },
+    mackerel: {
+      name: '鲭鱼',
+      type: 'consumable',
+      icon: '🐠',
+      stack: 8,
+      tint: '#8fd5d0',
+      description: '更肥美的鱼获，恢复更多体力。'
+    },
+    eel: {
+      name: '鳗鱼',
+      type: 'consumable',
+      icon: '🐡',
+      stack: 6,
+      tint: '#d3b7ff',
+      description: '夜间更容易钓上的稀有鱼获。'
+    },
     campfire: {
       name: '篝火套件',
       type: 'buildable',

@@ -66,6 +66,29 @@
       return true;
     }
 
+    if (key === 'sardine') {
+      player.survival.hunger = Math.min(100, player.survival.hunger + 14);
+      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 2);
+      showMessage('吃下沙丁鱼');
+      return true;
+    }
+
+    if (key === 'mackerel') {
+      player.survival.hunger = Math.min(100, player.survival.hunger + 22);
+      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 3);
+      player.survival.energy = Math.min(100, player.survival.energy + 4);
+      showMessage('吃下鲭鱼');
+      return true;
+    }
+
+    if (key === 'eel') {
+      player.survival.hunger = Math.min(100, player.survival.hunger + 18);
+      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 4);
+      player.survival.energy = Math.min(100, player.survival.energy + 10);
+      showMessage('吃下鳗鱼');
+      return true;
+    }
+
     return false;
   }
 

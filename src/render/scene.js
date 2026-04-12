@@ -14,6 +14,7 @@
     drawStructure,
     drawEnemy,
     drawPlayer,
+    drawFishingCast,
     drawParticles,
     drawBuildGhost,
     drawAtmosphere,
@@ -67,6 +68,7 @@
       if (drawable.type === 'player') drawPlayer(shakeX, shakeY);
     }
 
+    drawFishingCast(shakeX, shakeY);
     drawBuildGhost(shakeX, shakeY);
     drawParticles(shakeX, shakeY);
     drawAtmosphere();

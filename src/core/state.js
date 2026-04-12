@@ -18,7 +18,18 @@
     score: 0,
     lastTimestamp: 0,
     shake: 0,
-    pointer: { x: 0, y: 0 }
+    pointer: { x: 0, y: 0 },
+    fishing: {
+      active: false,
+      phase: 'idle',
+      x: 0,
+      y: 0,
+      tile: '',
+      waitTimer: 0,
+      reelWindow: 0,
+      ripple: 0,
+      animationTime: 0
+    }
   };
 
   const craftButtons = new Map();

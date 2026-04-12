@@ -69,8 +69,62 @@
     if (toolKey === 'spear') ctx.lineTo(22, -3);
     else if (toolKey === 'pickaxe') ctx.lineTo(18, 5);
     else if (toolKey === 'axe') ctx.lineTo(18, 2);
+    else if (toolKey === 'fishingRod') ctx.lineTo(24, -9);
     else ctx.lineTo(14, 0);
     ctx.stroke();
+
+    if (toolKey === 'fishingRod') {
+      ctx.strokeStyle = 'rgba(220, 245, 255, 0.75)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(20, -7);
+      ctx.lineTo(25, -13);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawFishingCast(shakeX, shakeY) {
+    const transform = getComponent(state.playerId, 'transform');
+    const player = getComponent(state.playerId, 'player');
+    if (!transform || !player || !state.fishing?.active) return;
+
+    const playerScreen = worldToScreen(transform.x, transform.y, shakeX, shakeY);
+    const bobberScreen = worldToScreen(state.fishing.x, state.fishing.y, shakeX, shakeY);
+    const bobOffset = Math.sin(state.fishing.animationTime || 0) * (state.fishing.phase === 'bite' ? 2.2 : 1.1);
+    const handX = player.facing === 'left' ? -6 : 6;
+    const handY = player.facing === 'up' ? -4 : player.facing === 'down' ? 2 : 0;
+    const arcHeight = Math.max(18, Math.min(54, Math.abs(bobberScreen.x - playerScreen.x) * 0.22 + 18));
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(220, 245, 255, 0.72)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(playerScreen.x + handX, playerScreen.y - 6 + handY);
+    ctx.quadraticCurveTo(
+      (playerScreen.x + bobberScreen.x) * 0.5,
+      Math.min(playerScreen.y, bobberScreen.y) - arcHeight,
+      bobberScreen.x,
+      bobberScreen.y + bobOffset
+    );
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff4f4';
+    ctx.beginPath();
+    ctx.arc(bobberScreen.x, bobberScreen.y + bobOffset, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff7d88';
+    ctx.fillRect(bobberScreen.x - 1, bobberScreen.y - 6 + bobOffset, 2, 5);
+
+    if (state.fishing.ripple > 0) {
+      ctx.strokeStyle = `rgba(160, 231, 255, ${state.fishing.ripple * 0.65})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(bobberScreen.x, bobberScreen.y + 3 + bobOffset, 8 + state.fishing.ripple * 8, 4 + state.fishing.ripple * 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
@@ -146,8 +200,9 @@
     const screen = worldToScreen(transform.x, transform.y, shakeX, shakeY);
     const hasPointer = state.pointer.x || state.pointer.y;
     const pointerWorld = hasPointer ? screenToWorld(state.pointer.x, state.pointer.y) : null;
-    const angle = pointerWorld
-      ? Math.atan2(pointerWorld.y - transform.y, pointerWorld.x - transform.x)
+    const aimTarget = toolKey === 'fishingRod' && state.fishing?.active ? state.fishing : pointerWorld;
+    const angle = aimTarget
+      ? Math.atan2(aimTarget.y - transform.y, aimTarget.x - transform.x)
       : player.facing === 'left'
         ? Math.PI
         : player.facing === 'up'
@@ -213,6 +268,7 @@
     drawStructure,
     drawEnemy,
     drawPlayer,
+    drawFishingCast,
     drawParticles,
     drawBuildGhost
   });
