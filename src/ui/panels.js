@@ -124,10 +124,8 @@
       const hasRoom = canStoreAllItems(player.inventory, { [key]: 1 });
       const craftedCount = player.inventory.slots.reduce((total, slot) => total + (slot?.key === key ? slot.amount : 0), 0);
       const item = ITEM_DEFS[key];
-      button.classList.toggle('active', selected.key === key && !selected.isFallback);
-      button.classList.toggle('disabled', !affordable || !hasRoom);
-      button.disabled = !affordable || !hasRoom;
-      button.innerHTML = `
+      const unavailable = !affordable || !hasRoom;
+      const markup = `
         <div class="craft-row">
           <span class="craft-icon" aria-hidden="true">${item.icon}</span>
           <div>
@@ -137,6 +135,16 @@
         </div>
         <span class="subtle">${formatCost(recipe.cost)}</span>
       `;
+
+      button.classList.toggle('active', selected.key === key && !selected.isFallback);
+      button.classList.toggle('disabled', unavailable);
+      button.disabled = false;
+      button.setAttribute('aria-disabled', unavailable ? 'true' : 'false');
+
+      if (button._markup !== markup) {
+        button.innerHTML = markup;
+        button._markup = markup;
+      }
     }
 
     dom.dayInfoEl.textContent = `第 ${state.day} 天 · ${getTimeLabel()}`;
