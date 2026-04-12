@@ -11,6 +11,8 @@
     getComponent,
     getBuildPreview,
     getSelectedItem,
+    getSelectedWorldTarget,
+    getStructureConfig,
     getParticleIds,
     drawTileSprite,
     drawEntitySprite,
@@ -255,6 +257,41 @@
     ctx.globalAlpha = 1;
   }
 
+  function drawSelectedWorldTargetHighlight(shakeX, shakeY) {
+    const target = getSelectedWorldTarget?.();
+    if (!target?.transform) return;
+
+    const screen = worldToScreen(target.transform.x, target.transform.y, shakeX, shakeY);
+    const pulse = 0.55 + Math.sin(performance.now() * 0.008) * 0.2;
+    let radius = 18;
+    let color = '#6ee7ff';
+
+    if (target.group === 'structure') {
+      const config = getStructureConfig(target.structure.kind);
+      radius = Math.max(18, (config?.collisionRadius || config?.radius || 14) + 8);
+      color = '#83f5ce';
+    } else if (target.group === 'resource') {
+      radius = Math.max(18, (target.collider?.radius || 12) + 8);
+      color = '#ffd37c';
+    } else if (target.group === 'enemy') {
+      radius = Math.max(18, (target.collider?.radius || 12) + 10);
+      color = '#ff768a';
+    }
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.45 + pulse * 0.35;
+    ctx.beginPath();
+    ctx.ellipse(screen.x, screen.y + 12, radius, Math.max(8, radius * 0.45), 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.82;
+    ctx.setLineDash([6, 5]);
+    ctx.strokeRect(screen.x - radius - 4, screen.y - radius - 10, radius * 2 + 8, radius * 2 + 20);
+    ctx.restore();
+  }
+
   function drawBuildGhost(shakeX, shakeY) {
     const preview = getBuildPreview();
     if (!preview) return;
@@ -269,6 +306,7 @@
     drawEnemy,
     drawPlayer,
     drawFishingCast,
+    drawSelectedWorldTargetHighlight,
     drawParticles,
     drawBuildGhost
   });

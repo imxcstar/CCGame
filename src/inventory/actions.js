@@ -14,6 +14,7 @@
     getItemConfig,
     isConsumableItem,
     isEquippableItem,
+    invokeItemUse,
     getInventoryReference,
     resolveInventoryReference,
     setSelectedInventoryIndex,
@@ -46,52 +47,7 @@
   }
 
   function applyConsumableEffect(player, key) {
-    if (key === 'berry') {
-      player.survival.hunger = Math.min(100, player.survival.hunger + 20);
-      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 3);
-      showMessage('吃下浆果');
-      return true;
-    }
-
-    if (key === 'coconut') {
-      player.survival.thirst = Math.min(100, player.survival.thirst + 28);
-      player.survival.hunger = Math.min(100, player.survival.hunger + 6);
-      showMessage('饮下椰汁');
-      return true;
-    }
-
-    if (key === 'meat') {
-      player.survival.hunger = Math.min(100, player.survival.hunger + 30);
-      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 4);
-      player.survival.energy = Math.min(100, player.survival.energy + 8);
-      showMessage('吃下熟肉');
-      return true;
-    }
-
-    if (key === 'sardine') {
-      player.survival.hunger = Math.min(100, player.survival.hunger + 14);
-      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 2);
-      showMessage('吃下沙丁鱼');
-      return true;
-    }
-
-    if (key === 'mackerel') {
-      player.survival.hunger = Math.min(100, player.survival.hunger + 22);
-      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 3);
-      player.survival.energy = Math.min(100, player.survival.energy + 4);
-      showMessage('吃下鲭鱼');
-      return true;
-    }
-
-    if (key === 'eel') {
-      player.survival.hunger = Math.min(100, player.survival.hunger + 18);
-      player.health.hp = Math.min(player.health.maxHp, player.health.hp + 4);
-      player.survival.energy = Math.min(100, player.survival.energy + 10);
-      showMessage('吃下鳗鱼');
-      return true;
-    }
-
-    return false;
+    return invokeItemUse(key, { player });
   }
 
   function consumeInventorySlot(inventoryIndex) {

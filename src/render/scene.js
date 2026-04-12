@@ -15,6 +15,7 @@
     drawEnemy,
     drawPlayer,
     drawFishingCast,
+    drawSelectedWorldTargetHighlight,
     drawParticles,
     drawBuildGhost,
     drawAtmosphere,
@@ -69,6 +70,7 @@
     }
 
     drawFishingCast(shakeX, shakeY);
+    drawSelectedWorldTargetHighlight(shakeX, shakeY);
     drawBuildGhost(shakeX, shakeY);
     drawParticles(shakeX, shakeY);
     drawAtmosphere();

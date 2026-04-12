@@ -21,10 +21,9 @@
     getStructureConfig,
     getEntityConfig,
     getEnemyConfig,
+    invokeItemPrimaryAction,
     isConsumableItem,
-    isBuildableItem,
     consumeInventorySlot,
-    tryPlaceStructure,
     getAttackTarget,
     getEnemyDamage,
     getResourceDamage,
@@ -323,6 +322,31 @@
     return dist(player.transform.x, player.transform.y, target.transform.x, target.transform.y);
   }
 
+  function canPayInventoryCost(inventory, cost) {
+    if (!inventory) return false;
+    return Object.entries(cost).every(([key, amount]) => countInventoryItem(inventory, key) >= amount);
+  }
+
+  function spendInventoryCost(inventory, cost) {
+    if (!inventory || !canPayInventoryCost(inventory, cost)) return false;
+    Object.entries(cost).forEach(([key, amount]) => {
+      removeItemFromInventory(inventory, key, amount);
+    });
+    return true;
+  }
+
+  function getStructureRepairCost(structure, health) {
+    const config = getStructureConfig(structure?.kind);
+    if (!config?.cost || !health || health.hp >= health.maxHp) return null;
+
+    const missingRatio = Math.max(0.1, (health.maxHp - health.hp) / Math.max(1, health.maxHp));
+    const cost = {};
+    for (const [key, amount] of Object.entries(config.cost)) {
+      cost[key] = Math.max(1, Math.ceil(amount * missingRatio * 0.5));
+    }
+    return cost;
+  }
+
   function interactWithStructure(structureId) {
     const player = getPlayerSnapshot();
     const transform = getComponent(structureId, 'transform');
@@ -363,6 +387,91 @@
 
     showMessage('这个结构没有可执行操作');
     return false;
+  }
+
+  function refuelCampfire(structureId, fillAll = false) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    if (!player?.inventory || !transform || !structure || structure.kind !== 'campfire') return false;
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) >= 62) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    const missingFuel = Math.max(0, 120 - (structure.fuel || 0));
+    if (missingFuel <= 0) {
+      showMessage('篝火燃料已满');
+      return false;
+    }
+
+    const availableWood = countInventoryItem(player.inventory, 'wood');
+    if (availableWood <= 0) {
+      showMessage('缺少木材');
+      return false;
+    }
+
+    const woodToUse = fillAll ? Math.min(availableWood, Math.ceil(missingFuel / 28)) : 1;
+    removeItemFromInventory(player.inventory, 'wood', woodToUse);
+    structure.fuel = Math.min(120, (structure.fuel || 0) + woodToUse * 28);
+    burst(transform.x, transform.y, '#ffca74', 6 + woodToUse, 28 + woodToUse * 3);
+    showMessage(fillAll ? '篝火已添满柴火' : '篝火添柴 +' + woodToUse);
+    setScore();
+    return true;
+  }
+
+  function drinkFromCollector(structureId, all = false) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    if (!player?.survival || !transform || !structure || structure.kind !== 'collector') return false;
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) >= 62) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if ((structure.water || 0) <= 0) {
+      showMessage('雨水收集器还没有水');
+      return false;
+    }
+
+    const amount = all ? Math.max(1, Math.min(structure.water || 0, Math.ceil((100 - player.survival.thirst) / 26))) : 1;
+    structure.water -= amount;
+    player.survival.thirst = Math.min(100, player.survival.thirst + amount * 34);
+    player.survival.energy = Math.min(100, player.survival.energy + amount * 6);
+    burst(transform.x, transform.y, '#81e7ff', 6 + amount, 30 + amount * 2);
+    showMessage(all ? '畅饮了 ' + amount + ' 份淡水' : '取水成功');
+    return true;
+  }
+
+  function repairStructure(structureId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    const health = getComponent(structureId, 'health');
+    if (!player?.inventory || !transform || !structure || !health) return false;
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) > 82) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    const repairCost = getStructureRepairCost(structure, health);
+    if (!repairCost) {
+      showMessage('该结构无需修理');
+      return false;
+    }
+
+    if (!canPayInventoryCost(player.inventory, repairCost)) {
+      showMessage('修理材料不足');
+      return false;
+    }
+
+    spendInventoryCost(player.inventory, repairCost);
+    health.hp = health.maxHp;
+    burst(transform.x, transform.y, '#93f59a', 8, 34);
+    showMessage('修理完成');
+    setScore();
+    return true;
   }
 
   function dismantleStructure(structureId) {
@@ -456,35 +565,46 @@
       const item = getItemConfig(target.structure.kind);
       const actions = [];
       const near = distance <= 62;
+      const dismantleEnabled = distance <= 82 && canStoreAllItems(player.inventory, { [target.structure.kind]: 1 });
+      const repairCost = getStructureRepairCost(target.structure, target.health);
+      const canRepair = !!repairCost && distance <= 82 && canPayInventoryCost(player.inventory, repairCost);
 
       if (target.structure.kind === 'campfire') {
         const hasWood = countInventoryItem(player.inventory, 'wood') > 0;
-        actions.push({ id: 'interact', label: hasWood ? '添柴' : '缺少木材', disabled: !near || !hasWood });
+        const missingFuel = Math.max(0, 120 - (target.structure.fuel || 0));
+        actions.push({ id: 'interact', label: hasWood ? '添柴' : '缺少木材', disabled: !near || !hasWood || missingFuel <= 0 });
+        actions.push({ id: 'refuel-max', label: hasWood ? '添满' : '添满', disabled: !near || !hasWood || missingFuel <= 0 });
       }
 
       if (target.structure.kind === 'collector') {
         const hasWater = (target.structure.water || 0) > 0;
         actions.push({ id: 'interact', label: hasWater ? '取水' : '暂无储水', disabled: !near || !hasWater });
+        actions.push({ id: 'drink-all', label: '畅饮', disabled: !near || !hasWater });
       }
 
       actions.push({
+        id: 'repair',
+        label: repairCost ? '修理 ' + Object.entries(repairCost).map(([key, value]) => getItemConfig(key).name + ' ' + value).join(' · ') : '无需修理',
+        disabled: !canRepair
+      });
+      actions.push({
         id: 'dismantle',
-        label: !canStoreAllItems(player.inventory, { [target.structure.kind]: 1 }) ? '背包已满' : '拆卸',
-        disabled: distance > 82 || !canStoreAllItems(player.inventory, { [target.structure.kind]: 1 })
+        label: dismantleEnabled ? '拆卸' : '背包已满',
+        disabled: !dismantleEnabled
       });
 
       const metaParts = [
         '距离 ' + Math.round(distance),
         '耐久 ' + Math.ceil(target.health.hp) + '/' + Math.ceil(target.health.maxHp)
       ];
-      if (target.structure.kind === 'campfire') metaParts.push('燃料 ' + Math.ceil(target.structure.fuel || 0));
+      if (target.structure.kind === 'campfire') metaParts.push('燃料 ' + Math.ceil(target.structure.fuel || 0) + '/120');
       if (target.structure.kind === 'collector') metaParts.push('储水 ' + Math.ceil(target.structure.water || 0));
 
       return {
         name: config?.name || item.name,
         typeLabel: '建筑',
         meta: metaParts.join(' · '),
-        description: item.description || '可以交互或拆卸的营地结构。',
+        description: item.description || '可以交互、修理或拆卸的营地结构。',
         actions
       };
     }
@@ -516,6 +636,9 @@
 
     if (target.group === 'structure') {
       if (actionId === 'interact') return interactWithStructure(target.id);
+      if (actionId === 'refuel-max') return refuelCampfire(target.id, true);
+      if (actionId === 'drink-all') return drinkFromCollector(target.id, true);
+      if (actionId === 'repair') return repairStructure(target.id);
       if (actionId === 'dismantle') return dismantleStructure(target.id);
       return false;
     }
@@ -575,22 +698,40 @@
     return '';
   }
 
+  function performEquippedAttack(toolKey = getActiveToolKey()) {
+    const player = getPlayerSnapshot();
+    if (!player?.transform || !player.player) return false;
+    if (player.player.attackCooldown > 0) return false;
+
+    player.player.attackCooldown = 0.26;
+    const target = getAttackTarget();
+    burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
+
+    if (!target) return true;
+
+    const damage = target.group === 'enemy' ? getEnemyDamage(toolKey, target.id) : getResourceDamage(toolKey, target.id);
+    state.shake = Math.max(state.shake, 4);
+
+    if (target.group === 'resource') {
+      const health = getComponent(target.id, 'health');
+      const resourceNode = getComponent(target.id, 'resourceNode');
+      if (!health || !resourceNode?.alive) return false;
+      health.hp -= damage;
+      health.hitTimer = 0.18;
+      if (health.hp <= 0) harvestResource(target.id);
+      return true;
+    }
+
+    hitEnemy(target.id, damage);
+    return true;
+  }
+
   function primaryAction() {
     if (!state.running || state.over) return;
 
     const selected = getSelectedItem();
-    if (selected.isFallback) {
-      selectWorldTargetAtPointer();
-      return;
-    }
-
     if (!selected.isFallback && isConsumableItem(selected.item)) {
       consumeInventorySlot(selected.inventoryIndex);
-      return;
-    }
-
-    if (!selected.isFallback && isBuildableItem(selected.item)) {
-      tryPlaceStructure();
       return;
     }
 
@@ -599,44 +740,21 @@
       return;
     }
 
-    if (selected.item?.toolKey === 'fishingRod') {
-      handleFishingAction();
+    if (invokeItemPrimaryAction(selected, { selected, player: getPlayerSnapshot() })) {
       return;
     }
 
-    const player = getPlayerSnapshot();
-    if (!player?.transform || !player.player) return;
-    if (player.player.attackCooldown > 0) return;
-
-    player.player.attackCooldown = 0.26;
-    const tool = getActiveToolKey();
-    const target = getAttackTarget();
-    burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
-
-    if (!target) return;
-
-    const damage = target.group === 'enemy' ? getEnemyDamage(tool, target.id) : getResourceDamage(tool, target.id);
-    state.shake = Math.max(state.shake, 4);
-
-    if (target.group === 'resource') {
-      const health = getComponent(target.id, 'health');
-      const resourceNode = getComponent(target.id, 'resourceNode');
-      if (!health || !resourceNode?.alive) return;
-      health.hp -= damage;
-      health.hitTimer = 0.18;
-      if (health.hp <= 0) harvestResource(target.id);
-      return;
-    }
-
-    hitEnemy(target.id, damage);
+    performEquippedAttack(getActiveToolKey());
   }
 
   Object.assign(game, {
     interact,
     getStructureHintText,
     primaryAction,
+    performEquippedAttack,
     cancelFishing,
     getFishingTarget,
+    handleFishingAction,
     updateFishingSystem,
     clearSelectedWorldTarget,
     selectWorldTargetAtPointer,

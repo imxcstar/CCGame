@@ -70,17 +70,17 @@
   function tryPlaceStructure() {
     const player = getPlayerSnapshot();
     const preview = getBuildPreview();
-    if (!player?.inventory || !preview) return;
+    if (!player?.inventory || !preview) return false;
 
     if (!preview.valid) {
       showMessage('这里无法建造');
-      return;
+      return false;
     }
 
     const removed = removeItemFromInventorySlot(player.inventory, preview.inventoryIndex, 1);
     if (removed <= 0) {
       showMessage('对应的建造物已不在背包中');
-      return;
+      return false;
     }
 
     if (!player.inventory.slots[preview.inventoryIndex] && state.selectedInventoryIndex === preview.inventoryIndex) {
@@ -92,6 +92,7 @@
     state.shake = Math.max(state.shake, 2);
     showMessage('建造完成：' + getItemConfig(preview.itemKey).name);
     setScore();
+    return true;
   }
 
   Object.assign(game, {
