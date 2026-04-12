@@ -7,6 +7,7 @@
     cost: { wood: 3, stone: 1 },
     hp: 20,
     radius: 16,
+    collisionRadius: 12,
     shadowRadius: 18,
     initialState() {
       return {};

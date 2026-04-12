@@ -7,6 +7,7 @@
     cost: { wood: 5, stone: 4 },
     hp: 18,
     radius: 18,
+    collisionRadius: 11,
     shadowRadius: 15,
     initialState() {
       return { fuel: 72 };

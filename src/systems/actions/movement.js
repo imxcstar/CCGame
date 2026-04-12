@@ -1,5 +1,5 @@
 (function (game) {
-  const { tileWalkable, tileAtWorld, dist, getStructureIds, getComponent } = game;
+  const { tileWalkable, tileAtWorld, dist, getStructureIds, getComponent, getStructureConfig } = game;
 
   function isBlocked(x, y, radius, actorId = null) {
     const samples = [
@@ -21,7 +21,9 @@
       const structure = getComponent(structureId, 'structure');
       if (!transform || !collider || !structure) continue;
       if (structure.kind === 'floor') continue;
-      if (collider.radius > 0 && dist(x, y, transform.x, transform.y) < radius + collider.radius) return true;
+
+      const collisionRadius = getStructureConfig(structure.kind)?.collisionRadius ?? collider.radius;
+      if (collisionRadius > 0 && dist(x, y, transform.x, transform.y) < radius + collisionRadius) return true;
     }
 
     return false;

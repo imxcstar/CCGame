@@ -7,6 +7,7 @@
     cost: { wood: 4, fiber: 4, stone: 2 },
     hp: 18,
     radius: 18,
+    collisionRadius: 12,
     shadowRadius: 15,
     initialState() {
       return { water: 1, fill: 0 };
