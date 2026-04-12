@@ -288,7 +288,9 @@
 
     ctx.globalAlpha = 0.82;
     ctx.setLineDash([6, 5]);
-    ctx.strokeRect(screen.x - radius - 4, screen.y - radius - 10, radius * 2 + 8, radius * 2 + 20);
+    ctx.beginPath();
+    ctx.ellipse(screen.x, screen.y + 12, radius + 5, Math.max(10, radius * 0.58), 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 

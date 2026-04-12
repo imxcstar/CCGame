@@ -74,12 +74,12 @@
     }
 
     if (selected?.isFallback && state.selectedWorldTarget) {
-      state.hint = '空手时左键选中目标，底部面板可执行采集/攻击/拆卸';
+      state.hint = '空手时左键可直接采集资源，底部面板仍可执行攻击/拆卸等操作';
       return;
     }
 
     if (selected?.isFallback) {
-      state.hint = '空手时左键可选中地图目标，底部面板显示可执行操作';
+      state.hint = '空手时左键可选中目标，点到资源会直接采集';
       return;
     }
 
