@@ -9,6 +9,7 @@
     getStructureIds,
     getResourceIds,
     getEnemyIds,
+    getSelectedWorldTarget,
     drawTile,
     drawEntity,
     drawStructure,
@@ -62,7 +63,15 @@
     if (playerTransform) drawables.push({ y: playerTransform.y, type: 'player', id: state.playerId });
     drawables.sort((first, second) => first.y - second.y);
 
+    const selectedTarget = getSelectedWorldTarget?.();
+    const selectedTargetType = selectedTarget?.group === 'resource'
+      ? 'entity'
+      : selectedTarget?.group;
+
     for (const drawable of drawables) {
+      if (selectedTarget && drawable.id === selectedTarget.id && drawable.type === selectedTargetType) {
+        drawSelectedWorldTargetHighlight(shakeX, shakeY);
+      }
       if (drawable.type === 'structure') drawStructure(drawable.id, shakeX, shakeY);
       if (drawable.type === 'entity') drawEntity(drawable.id, shakeX, shakeY);
       if (drawable.type === 'enemy') drawEnemy(drawable.id, shakeX, shakeY);
@@ -70,7 +79,6 @@
     }
 
     drawFishingCast(shakeX, shakeY);
-    drawSelectedWorldTargetHighlight(shakeX, shakeY);
     drawBuildGhost(shakeX, shakeY);
     drawParticles(shakeX, shakeY);
     drawAtmosphere();

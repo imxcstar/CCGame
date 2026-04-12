@@ -1,4 +1,4 @@
-import.meta.glob('./items/*.js', { eager: true });
+import.meta.glob('./items/**/*.js', { eager: true });
 
 (function (game) {
   const ITEM_TYPE_NAMES = {
