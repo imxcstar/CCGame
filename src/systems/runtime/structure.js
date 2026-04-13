@@ -37,7 +37,6 @@
       if (structure.kind === 'planter' && structure.crop === 'pumpkin' && !structure.ready) {
         structure.growth = Math.min(1, (structure.growth || 0) + dt * (isNight() ? PUMPKIN_GROWTH_RATE.night : PUMPKIN_GROWTH_RATE.day));
         if (structure.growth >= 1) {
-          structure.growth = 1;
           structure.ready = true;
         }
       }
