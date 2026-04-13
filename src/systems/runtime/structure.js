@@ -33,6 +33,14 @@
         }
       }
 
+      if (structure.kind === 'planter' && structure.crop === 'pumpkin' && !structure.ready) {
+        structure.growth = Math.min(1, (structure.growth || 0) + dt * (isNight() ? 0.012 : 0.02));
+        if (structure.growth >= 1) {
+          structure.growth = 1;
+          structure.ready = true;
+        }
+      }
+
       if (health.hp <= 0) {
         burst(transform.x, transform.y, '#d5b287', 12, 55);
         removeChunkStructureEntity?.(structureId);

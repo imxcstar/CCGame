@@ -49,6 +49,13 @@
     crawler: { name: '暗潮爬行者', description: '夜晚会主动追击你，长矛对它更有效。' }
   };
 
+  const CAMPFIRE_FISH_KEYS = ['eel', 'mackerel', 'sardine'];
+
+  function getCookableFishKey(inventory) {
+    if (!inventory) return null;
+    return CAMPFIRE_FISH_KEYS.find((key) => countInventoryItem(inventory, key) > 0) || null;
+  }
+
   function getActiveToolKey() {
     const selected = getSelectedItem();
     return selected.item?.toolKey || 'hands';
@@ -385,8 +392,76 @@
       return true;
     }
 
+    if (structure.kind === 'planter') {
+      if (!structure.crop) {
+        if (countInventoryItem(player.inventory, 'seedPack') <= 0) {
+          showMessage('缺少混合种子包');
+          return false;
+        }
+
+        removeItemFromInventory(player.inventory, 'seedPack', 1);
+        structure.crop = 'pumpkin';
+        structure.growth = 0;
+        structure.ready = false;
+        burst(transform.x, transform.y, '#9fd77c', 6, 24);
+        showMessage('种下了一包混合种子');
+        setScore();
+        return true;
+      }
+
+      if (!structure.ready) {
+        showMessage('作物还在生长');
+        return false;
+      }
+
+      const harvestLoot = { pumpkin: 2 };
+      if (!canStoreAllItems(player.inventory, harvestLoot)) {
+        showMessage('背包空间不足');
+        return false;
+      }
+
+      addInventory(harvestLoot);
+      structure.crop = null;
+      structure.growth = 0;
+      structure.ready = false;
+      burst(transform.x, transform.y, '#ffb562', 8, 28);
+      showMessage('收获了 2 个南瓜');
+      setScore();
+      return true;
+    }
+
     showMessage('这个结构没有可执行操作');
     return false;
+  }
+
+  function cookAtCampfire(structureId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    if (!player?.inventory || !transform || !structure || structure.kind !== 'campfire') return false;
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) >= 62) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    if ((structure.fuel || 0) < 10) {
+      showMessage('篝火火力不足');
+      return false;
+    }
+
+    const fishKey = getCookableFishKey(player.inventory);
+    if (!fishKey) {
+      showMessage('需要鱼获才能烹饪');
+      return false;
+    }
+
+    removeItemFromInventory(player.inventory, fishKey, 1);
+    structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
+    addInventory({ grilledFish: 1 });
+    burst(transform.x, transform.y, '#ffc887', 7, 28);
+    showMessage('烹饪完成：烤鱼');
+    setScore();
+    return true;
   }
 
   function refuelCampfire(structureId, fillAll = false) {
@@ -571,15 +646,37 @@
 
       if (target.structure.kind === 'campfire') {
         const hasWood = countInventoryItem(player.inventory, 'wood') > 0;
+        const cookableFish = getCookableFishKey(player.inventory);
         const missingFuel = Math.max(0, 120 - (target.structure.fuel || 0));
         actions.push({ id: 'interact', label: hasWood ? '添柴' : '缺少木材', disabled: !near || !hasWood || missingFuel <= 0 });
         actions.push({ id: 'refuel-max', label: hasWood ? '添满' : '添满', disabled: !near || !hasWood || missingFuel <= 0 });
+        actions.push({
+          id: 'cook-fish',
+          label: cookableFish ? '烤鱼' : '缺少鱼获',
+          disabled: !near || !cookableFish || (target.structure.fuel || 0) < 10
+        });
       }
 
       if (target.structure.kind === 'collector') {
         const hasWater = (target.structure.water || 0) > 0;
         actions.push({ id: 'interact', label: hasWater ? '取水' : '暂无储水', disabled: !near || !hasWater });
         actions.push({ id: 'drink-all', label: '畅饮', disabled: !near || !hasWater });
+      }
+
+      if (target.structure.kind === 'planter') {
+        const hasSeeds = countInventoryItem(player.inventory, 'seedPack') > 0;
+        const canHarvest = canStoreAllItems(player.inventory, { pumpkin: 2 });
+        actions.push({
+          id: 'interact',
+          label: !target.structure.crop
+            ? hasSeeds
+              ? '播种'
+              : '缺少种子包'
+            : target.structure.ready
+              ? '收获南瓜'
+              : '生长中',
+          disabled: !near || (!target.structure.crop ? !hasSeeds : target.structure.ready ? !canHarvest : true)
+        });
       }
 
       actions.push({
@@ -599,6 +696,11 @@
       ];
       if (target.structure.kind === 'campfire') metaParts.push('燃料 ' + Math.ceil(target.structure.fuel || 0) + '/120');
       if (target.structure.kind === 'collector') metaParts.push('储水 ' + Math.ceil(target.structure.water || 0));
+      if (target.structure.kind === 'planter') {
+        if (!target.structure.crop) metaParts.push('状态 空闲');
+        else if (target.structure.ready) metaParts.push('状态 已成熟');
+        else metaParts.push('生长 ' + Math.max(1, Math.round((target.structure.growth || 0) * 100)) + '%');
+      }
 
       return {
         name: config?.name || item.name,
@@ -637,6 +739,7 @@
     if (target.group === 'structure') {
       if (actionId === 'interact') return interactWithStructure(target.id);
       if (actionId === 'refuel-max') return refuelCampfire(target.id, true);
+      if (actionId === 'cook-fish') return cookAtCampfire(target.id);
       if (actionId === 'drink-all') return drinkFromCollector(target.id, true);
       if (actionId === 'repair') return repairStructure(target.id);
       if (actionId === 'dismantle') return dismantleStructure(target.id);
@@ -667,7 +770,8 @@
         const transform = getComponent(structureId, 'transform');
         const structure = getComponent(structureId, 'structure');
         if (!transform || !structure) return false;
-        return (structure.kind === 'campfire' || structure.kind === 'collector') && dist(player.transform.x, player.transform.y, transform.x, transform.y) < 62;
+        return (structure.kind === 'campfire' || structure.kind === 'collector' || structure.kind === 'planter') &&
+          dist(player.transform.x, player.transform.y, transform.x, transform.y) < 62;
       })
       .sort((firstId, secondId) => {
         const first = getComponent(firstId, 'transform');
@@ -693,6 +797,14 @@
 
     if (structure.kind === 'collector') {
       return structure.water > 0 ? 'E 取水：雨水收集器已储满 ' + structure.water + ' 单位' : '';
+    }
+
+    if (structure.kind === 'planter') {
+      if (!structure.crop) {
+        return countInventoryItem(player.inventory, 'seedPack') > 0 ? 'E 播种：种下混合种子包' : '';
+      }
+
+      return structure.ready ? 'E 收获：成熟的南瓜可以采摘了' : '南瓜正在生长';
     }
 
     return '';
