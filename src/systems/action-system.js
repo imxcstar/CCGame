@@ -473,7 +473,7 @@
 
     const fishKey = getCookableFishKey(player.inventory);
     if (!fishKey) {
-      showMessage('需要生鱼才能烹饪');
+      showMessage('需要沙丁鱼、鲭鱼或鳗鱼才能烹饪');
       return false;
     }
 
@@ -674,7 +674,7 @@
         actions.push({ id: 'refuel-max', label: hasWood ? '添满' : '添满', disabled: !near || !hasWood || missingFuel <= 0 });
         actions.push({
           id: 'cook-fish',
-          label: cookableFish ? '烤鱼' : '缺少生鱼',
+          label: cookableFish ? '烤鱼' : '缺少可烤鱼类',
           disabled: !near || !cookableFish || (target.structure.fuel || 0) < 10
         });
       }

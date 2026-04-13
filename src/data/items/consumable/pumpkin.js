@@ -12,7 +12,7 @@
     icon: '🎃',
     stack: 10,
     tint: '#ffb562',
-    description: '种植后收获的蔬食，能同时恢复饥饿和体力。',
+    description: '种植后收获的蔬果，能同时恢复饥饿和体力。',
     use({ player, game: runtime }) {
       if (!player?.survival || !player?.health) return false;
       player.survival.hunger = Math.min(100, player.survival.hunger + PUMPKIN_RESTORE.hunger);
