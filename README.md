@@ -35,7 +35,7 @@
 
 ### 环境要求
 
-- Node.js 20+（GitHub Pages 工作流使用 Node 20）
+- Node.js 20.x（与仓库当前 GitHub Pages 工作流保持一致）
 - npm
 
 ### 安装依赖
