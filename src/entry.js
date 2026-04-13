@@ -29,6 +29,7 @@ import './components/structures/campfire.js';
 import './components/structures/wall.js';
 import './components/structures/floor.js';
 import './components/structures/collector.js';
+import './components/structures/planter.js';
 import './components/structures/registry.js';
 import './components/structures.js';
 import './components/enemies/crawler.js';
