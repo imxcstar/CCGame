@@ -699,7 +699,7 @@
       if (target.structure.kind === 'planter') {
         if (!target.structure.crop) metaParts.push('状态 空闲');
         else if (target.structure.ready) metaParts.push('状态 已成熟');
-        else metaParts.push('生长 ' + Math.max(1, Math.round((target.structure.growth || 0) * 100)) + '%');
+        else metaParts.push('生长 ' + Math.max(0, Math.round((target.structure.growth || 0) * 100)) + '%');
       }
 
       return {
