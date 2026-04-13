@@ -1,5 +1,6 @@
 (function (game) {
   const { getStructureIds, getComponent, randomBetween, burst, destroyEntity, spawnParticleEntity, isNight, removeChunkStructureEntity } = game;
+  const PUMPKIN_GROWTH_RATE = { day: 0.02, night: 0.012 };
 
   function updateStructureSystem(dt) {
     for (const structureId of [...getStructureIds()]) {
@@ -34,7 +35,7 @@
       }
 
       if (structure.kind === 'planter' && structure.crop === 'pumpkin' && !structure.ready) {
-        structure.growth = Math.min(1, (structure.growth || 0) + dt * (isNight() ? 0.012 : 0.02));
+        structure.growth = Math.min(1, (structure.growth || 0) + dt * (isNight() ? PUMPKIN_GROWTH_RATE.night : PUMPKIN_GROWTH_RATE.day));
         if (structure.growth >= 1) {
           structure.growth = 1;
           structure.ready = true;

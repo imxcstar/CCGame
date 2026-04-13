@@ -49,11 +49,33 @@
     crawler: { name: '暗潮爬行者', description: '夜晚会主动追击你，长矛对它更有效。' }
   };
 
-  const CAMPFIRE_FISH_KEYS = ['eel', 'mackerel', 'sardine'];
+  const CAMPFIRE_COOKABLE_FISH_KEYS = ['eel', 'mackerel', 'sardine'];
 
   function getCookableFishKey(inventory) {
     if (!inventory) return null;
-    return CAMPFIRE_FISH_KEYS.find((key) => countInventoryItem(inventory, key) > 0) || null;
+    return CAMPFIRE_COOKABLE_FISH_KEYS.find((key) => countInventoryItem(inventory, key) > 0) || null;
+  }
+
+  function getPlanterActionState(inventory, structure, near) {
+    if (!structure?.crop) {
+      const hasSeeds = countInventoryItem(inventory, 'seedPack') > 0;
+      return {
+        label: hasSeeds ? '播种' : '缺少种子包',
+        disabled: !near || !hasSeeds
+      };
+    }
+
+    if (!structure.ready) {
+      return {
+        label: '生长中',
+        disabled: true
+      };
+    }
+
+    return {
+      label: '收获南瓜',
+      disabled: !near || !canStoreAllItems(inventory, { pumpkin: 2 })
+    };
   }
 
   function getActiveToolKey() {
@@ -664,18 +686,11 @@
       }
 
       if (target.structure.kind === 'planter') {
-        const hasSeeds = countInventoryItem(player.inventory, 'seedPack') > 0;
-        const canHarvest = canStoreAllItems(player.inventory, { pumpkin: 2 });
+        const planterAction = getPlanterActionState(player.inventory, target.structure, near);
         actions.push({
           id: 'interact',
-          label: !target.structure.crop
-            ? hasSeeds
-              ? '播种'
-              : '缺少种子包'
-            : target.structure.ready
-              ? '收获南瓜'
-              : '生长中',
-          disabled: !near || (!target.structure.crop ? !hasSeeds : target.structure.ready ? !canHarvest : true)
+          label: planterAction.label,
+          disabled: planterAction.disabled
         });
       }
 
