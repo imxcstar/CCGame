@@ -89,6 +89,67 @@
       </ul>
       <div class="overlay-actions">
         <button class="primary" id="startBtn">开始生存</button>
+        <button type="button" id="openMultiplayerBtn">联机</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="multiplayerOverlay">
+    <div class="overlay-card multiplayer-card">
+      <h2>联机房间</h2>
+      <p>基于 WebRTC + 公共 BitTorrent tracker 信令，无需服务器。把房间码分享给好友即可一起游玩。</p>
+
+      <div class="mp-section">
+        <label class="mp-field">
+          <span>玩家昵称</span>
+          <input type="text" id="mpNameInput" maxlength="32" placeholder="输入昵称（最多 32 字）">
+        </label>
+      </div>
+
+      <div class="mp-section mp-actions" id="mpLobbyActions">
+        <button type="button" class="primary" id="mpHostBtn">创建房间</button>
+        <div class="mp-join-row">
+          <input type="text" id="mpJoinCodeInput" maxlength="12" placeholder="输入房间码" autocomplete="off" spellcheck="false">
+          <button type="button" id="mpJoinBtn">加入房间</button>
+        </div>
+        <div class="mp-error" id="mpError"></div>
+      </div>
+
+      <div class="mp-section mp-room" id="mpRoomSection" hidden>
+        <div class="mp-room-header">
+          <div>
+            <div class="subtle">房间码</div>
+            <div class="mp-room-code">
+              <span id="mpRoomCode">------</span>
+              <button type="button" id="mpCopyCodeBtn" class="mp-mini-btn">复制</button>
+            </div>
+          </div>
+          <div class="mp-room-status" id="mpRoomStatus">未连接</div>
+        </div>
+
+        <div class="mp-peers">
+          <div class="section-title">房间成员</div>
+          <ul id="mpPeerList" class="mp-peer-list"></ul>
+        </div>
+
+        <div class="mp-chat">
+          <div class="section-title">聊天</div>
+          <div id="mpChatLog" class="mp-chat-log" aria-live="polite"></div>
+          <form id="mpChatForm" class="mp-chat-form" autocomplete="off">
+            <input type="text" id="mpChatInput" maxlength="300" placeholder="按 Enter 发送消息">
+            <button type="submit">发送</button>
+          </form>
+        </div>
+
+        <div class="mp-room-footer">
+          <button type="button" id="mpLeaveBtn">离开房间</button>
+        </div>
+
+        <p class="mp-note">提示：当前为联机基础功能（房间 + 聊天）。游戏世界同步将在后续版本中提供。</p>
+      </div>
+
+      <div class="overlay-actions">
+        <button type="button" id="mpCloseBtn">关闭</button>
       </div>
     </div>
   </div>

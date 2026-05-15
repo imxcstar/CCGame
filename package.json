@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "vite": "^8.0.8"
+  },
+  "dependencies": {
+    "trystero": "^0.24.0"
   }
 }

@@ -4,6 +4,7 @@
     game.bindInventoryUi();
     game.bindOverlayButtons();
     game.bindMobileControls?.();
+    game.bindMultiplayerUi?.();
   }
 
   Object.assign(game, {
