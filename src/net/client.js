@@ -207,10 +207,14 @@
     remoteEnemyMap.delete(netId);
     try {
       game.removeChunkEnemyEntity?.(entityId);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[net/client] removeChunkEnemyEntity failed', netId, err);
+    }
     try {
       game.destroyEntity?.(entityId);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[net/client] destroyEntity failed', netId, err);
+    }
   }
 
   function applyEntityDelta(data) {
