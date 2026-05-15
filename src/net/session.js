@@ -216,8 +216,19 @@
         ts: Date.now()
       });
     }
+    const wasHost = !!peer?.isHost;
     session.peers.delete(peerId);
     emit('change', session);
+    // 房主迁移：若刚刚离开的是房主、且本地仍在房间里且角色是 client，启动
+    // 确定性选举来决定新 host。规则：剩余在线 peerId（含自己 selfId）字典序
+    // 升序排序后取最小者；这样所有 peer 同时计算出同一个新房主。
+    if (wasHost && session.status === 'connected' && session.role === NET_ROLES.CLIENT) {
+      try {
+        electNewHostAfterDisconnect();
+      } catch (err) {
+        console.warn('[net session] elect new host error', err);
+      }
+    }
   });
 
   bindChannels();
@@ -330,6 +341,103 @@
     emit('change', session);
   }
 
+  // 房主行为：踢人 / 转让房主 -----------------------------------------
+  function kickPeer(peerId) {
+    if (session.role !== NET_ROLES.HOST) return false;
+    if (!peerId || peerId === netTransport.getSelfId()) return false;
+    const peer = session.peers.get(peerId);
+    if (!peer) return false;
+    const ok = game.netHostKickPeer?.(peerId, '被房主移出房间') === true;
+    if (ok) {
+      pushChat({ system: true, text: `${peer.name} 已被踢出房间`, ts: Date.now() });
+      session.peers.delete(peerId);
+      emit('change', session);
+    }
+    return ok;
+  }
+
+  function transferHostTo(peerId) {
+    if (session.role !== NET_ROLES.HOST) return false;
+    if (!peerId || peerId === netTransport.getSelfId()) return false;
+    const peer = session.peers.get(peerId);
+    if (!peer) return false;
+    const ok = game.netHostTransferTo?.(peerId) === true;
+    if (!ok) return false;
+    // 自己停掉 host 循环并切到 client。新房主在收到 HOST_TRANSFER 后会自己 startHost。
+    game.netHostStop?.();
+    session.role = NET_ROLES.CLIENT;
+    const selfId = netTransport.getSelfId();
+    const localPeer = selfId ? session.peers.get(selfId) : null;
+    if (localPeer) localPeer.isHost = false;
+    if (peer) peer.isHost = true;
+    pushChat({ system: true, text: `房主已转让给 ${peer.name}`, ts: Date.now() });
+    game.showMessage?.('已转让房主：' + peer.name, 3.0);
+    // 启动一份 client 来继续接收新房主的 SNAPSHOT/ENTITY_DELTA
+    game.netClientStart?.();
+    emit('change', session);
+    return true;
+  }
+
+  // 被升格为新房主：保留当前世界作为新的权威世界，启动 host 循环。
+  function acceptHostPromotion({ fromPeerId, seed, day, time, voluntary } = {}) {
+    if (session.role === NET_ROLES.HOST) return; // 已经是 host
+    // 把自己当前 client 端的"远端 ghost"清理 / 转换。client 模块负责拆掉
+    // 自己的循环（但保留世界状态），然后我们用现有 state.seed/day/time 作为
+    // 新权威。
+    game.netClientDetachForPromotion?.();
+    session.role = NET_ROLES.HOST;
+    const selfId = netTransport.getSelfId();
+    const localPeer = selfId ? session.peers.get(selfId) : null;
+    if (localPeer) localPeer.isHost = true;
+    // 其他 peer 的 isHost 全部清掉（除了自己）
+    session.peers.forEach((p) => { if (p.id !== selfId) p.isHost = false; });
+    game.netHostStart?.();
+    // 升格后发一次 HELLO，让其他 peer 更新自己的 isHost 标记
+    netTransport.getPeers().forEach((peerId) => sendHelloTo(peerId));
+    const tag = voluntary ? '主动转让' : '原房主掉线';
+    pushChat({ system: true, text: `你已被升为房主（${tag}）`, ts: Date.now() });
+    game.showMessage?.('你已成为新房主', 3.0);
+    emit('change', session);
+  }
+
+  function notePeerIsHost(peerId) {
+    if (!peerId) return;
+    const selfId = netTransport.getSelfId();
+    session.peers.forEach((p) => {
+      p.isHost = (p.id === peerId);
+    });
+    const peer = session.peers.get(peerId);
+    if (peer) {
+      pushChat({ system: true, text: `房主已变更为 ${peer.name}`, ts: Date.now() });
+      game.showMessage?.('新房主：' + peer.name, 3.0);
+    }
+    emit('change', session);
+  }
+
+  // 房主掉线后的去中心化选举：所有剩余 peer 跑同一个排序算法得到同一个
+  // 新房主，避免依赖中心节点。规则：把仍在 session.peers 中的所有 peerId
+  // （含本地 selfId）按字典序升序排序，取第一个。被选中的 peer 自己执行
+  // acceptHostPromotion；其他 peer 等接到新 host 的 HELLO / HOST_TRANSFER
+  // 后再更新自己的视图。
+  function electNewHostAfterDisconnect() {
+    const selfId = netTransport.getSelfId();
+    if (!selfId) return;
+    const candidates = Array.from(session.peers.keys()).sort();
+    if (candidates.length === 0) return;
+    const winner = candidates[0];
+    if (winner === selfId) {
+      // 自己中选
+      acceptHostPromotion({ fromPeerId: null, voluntary: false });
+    } else {
+      // 给定的 winner 应该会同步晋升。给一个超时保护：1.5s 内若没收到来自
+      // 新 host 的 HELLO（HOST_TRANSFER 是主动转让才发送）就回退到下一个
+      // 候选。为简化 MVP，这里只发出系统消息提示玩家"等待新房主接管"。
+      const peer = session.peers.get(winner);
+      pushChat({ system: true, text: `等待 ${peer?.name || winner.slice(0, 4)} 接管房主…`, ts: Date.now() });
+      emit('change', session);
+    }
+  }
+
   game.netSession = {
     state: session,
     on,
@@ -339,6 +447,10 @@
     sendChat,
     setLocalName,
     refreshLatencies,
+    kickPeer,
+    transferHostTo,
+    acceptHostPromotion,
+    notePeerIsHost,
     isConnected: () => session.status === 'connected',
     isHost: () => session.role === NET_ROLES.HOST
   };

@@ -93,6 +93,9 @@
     entry.isMoving = data.m === 1;
     if (typeof data.a === 'number') entry.animationTime = data.a;
     if (typeof data.h === 'number' && data.h >= 0) entry.hp = data.h;
+    // 记录最近一次看到的 input 序号，下次 SNAPSHOT 会把它作为 ack 一起发回
+    // 给 client，让 client 据此裁剪本地未确认 input 历史，做对账判断。
+    if (typeof data.q === 'number') entry.ackSeq = data.q | 0;
     entry.lastUpdate = performance.now();
   }
 
@@ -133,7 +136,8 @@
         facing: entry.facing,
         isMoving: entry.isMoving,
         animationTime: entry.animationTime,
-        hp: entry.hp
+        hp: entry.hp,
+        ackSeq: entry.ackSeq || 0
       });
     });
 
@@ -344,10 +348,12 @@
   // ---------------- ACTION_REQ -> INVENTORY ----------------
 
   // 解析 client 发来的 netId，返回 host 端的本地 entityId 与 group。
-  // 规则与上面 enemyNetId / resourceNetId 对称：
+  // 规则与上面 enemyNetId / resourceNetId / structureNetId 对称：
   //   r:<chunkKey>:<slot>     -> chunk.loadedResourceIds[slot]
   //   e:<chunkKey>:<slot>     -> chunk.loadedEnemyIds[slot]
   //   e:d:<entityId>          -> 直接 parse 出 host 本地 entityId
+  //   s:<chunkKey>:<slot>     -> chunk.loadedStructureIds[slot]（保留位）
+  //   s:d:<entityId>          -> 直接 parse 出 host 本地 entityId
   function resolveTargetByNetId(netId) {
     if (typeof netId !== 'string' || !netId) return null;
     if (netId.startsWith('r:')) {
@@ -378,6 +384,23 @@
       if (!chunk || !Array.isArray(chunk.loadedEnemyIds)) return null;
       const id = chunk.loadedEnemyIds[slot];
       return id ? { group: 'enemy', id } : null;
+    }
+    if (netId.startsWith('s:d:')) {
+      const id = parseInt(netId.slice(4), 10);
+      if (!Number.isFinite(id)) return null;
+      if (typeof getStructureIds === 'function' && !getStructureIds().includes(id)) return null;
+      return { group: 'structure', id };
+    }
+    if (netId.startsWith('s:')) {
+      const rest = netId.slice(2);
+      const lastColon = rest.lastIndexOf(':');
+      if (lastColon < 0) return null;
+      const chunkKey = rest.slice(0, lastColon);
+      const slot = parseInt(rest.slice(lastColon + 1), 10);
+      const chunk = state.world?.chunks?.get(chunkKey);
+      if (!chunk || !Array.isArray(chunk.loadedStructureIds)) return null;
+      const id = chunk.loadedStructureIds[slot];
+      return id ? { group: 'structure', id } : null;
     }
     return null;
   }
@@ -535,20 +558,226 @@
     // 下一拍 broadcastEntityDelta 会把这个新建筑（含 netId）推给所有 client。
   }
 
+  // 结构相关交互在 host 端的统一入口。client 一般已在本地做了"消耗品扣除 /
+  // 视觉反馈"，host 只负责世界状态权威修改与战利品分发；若校验失败可通过
+  // INVENTORY 回退已扣材料。
+  const STRUCTURE_RANGE = 62 + PEER_RANGE_SLACK;
+  const REPAIR_DISMANTLE_RANGE = 82 + PEER_RANGE_SLACK;
+
+  function refundPeerItems(peerId, items, reason) {
+    if (!peerId || !items) return;
+    const trimmed = {};
+    let any = false;
+    for (const [k, v] of Object.entries(items)) {
+      if (v > 0) { trimmed[k] = v; any = true; }
+    }
+    if (!any) return;
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: trimmed, reason: reason || 'refund' }),
+      peerId
+    );
+  }
+
+  function getPeerStructure(target) {
+    if (!target || target.group !== 'structure') return null;
+    const transform = getComponent(target.id, 'transform');
+    const structure = getComponent(target.id, 'structure');
+    const health = getComponent(target.id, 'health');
+    if (!transform || !structure) return null;
+    return { transform, structure, health };
+  }
+
+  function handleStructureInteract(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
+
+    if (structure.kind === 'campfire') {
+      // 添柴 +1
+      structure.fuel = Math.min(120, (structure.fuel || 0) + 28);
+      if (typeof burst === 'function') burst(transform.x, transform.y, '#ffca74', 6, 28);
+      return;
+    }
+    if (structure.kind === 'collector') {
+      // 取水 -1：若 host 端水量不足说明 client 状态滞后，不修改并让 ENTITY_DELTA 自然回滚
+      if ((structure.water || 0) <= 0) return;
+      structure.water = Math.max(0, (structure.water || 0) - 1);
+      if (typeof burst === 'function') burst(transform.x, transform.y, '#81e7ff', 7, 30);
+      return;
+    }
+    if (structure.kind === 'planter') {
+      if (!structure.crop) {
+        structure.crop = 'pumpkin';
+        structure.growth = 0;
+        structure.ready = false;
+        if (typeof burst === 'function') burst(transform.x, transform.y, '#9fd77c', 6, 24);
+      }
+      return;
+    }
+  }
+
+  function handleStructureRefuel(peerId, peerEntry, target, fillAll) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (structure.kind !== 'campfire') return;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
+    const missingFuel = Math.max(0, 120 - (structure.fuel || 0));
+    if (missingFuel <= 0) return;
+    const woodToUse = fillAll ? Math.ceil(missingFuel / 28) : 1;
+    structure.fuel = Math.min(120, (structure.fuel || 0) + woodToUse * 28);
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#ffca74', 6 + woodToUse, 28 + woodToUse * 3);
+  }
+
+  function handleStructureDrink(peerId, peerEntry, target, drinkAll) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (structure.kind !== 'collector') return;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
+    if ((structure.water || 0) <= 0) return;
+    const amount = drinkAll ? (structure.water || 0) : 1;
+    structure.water = Math.max(0, (structure.water || 0) - amount);
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#81e7ff', 6 + amount, 30 + amount * 2);
+  }
+
+  function handleStructureCook(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (structure.kind !== 'campfire') return;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
+    if ((structure.fuel || 0) < 10) {
+      // 燃料不足：把客户端已扣的鱼退回去（fish key 写在 data.k 字段）
+      refundPeerItems(peerId, target.refundOnFail ? { [target.refundOnFail]: 1 } : null, 'cook_no_fuel');
+      return;
+    }
+    structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#ffc887', 7, 28);
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: { grilledFish: 1 }, reason: 'cook' }),
+      peerId
+    );
+  }
+
+  function handleStructureRepair(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx?.health) return;
+    const { transform, structure, health } = ctx;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > REPAIR_DISMANTLE_RANGE) return;
+    if (health.hp >= health.maxHp) return;
+    health.hp = health.maxHp;
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#93f59a', 8, 34);
+  }
+
+  function handleStructureDismantle(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > REPAIR_DISMANTLE_RANGE) return;
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#83f5ce', 10, 42);
+    // 物品回收（与本地 dismantleStructure 行为一致）
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: { [structure.kind]: 1 }, reason: 'dismantle' }),
+      peerId
+    );
+    try { game.removeChunkStructureEntity?.(target.id); } catch (err) { console.warn('[net/host] removeChunkStructureEntity', err); }
+    try { destroyEntity(target.id); } catch (err) { console.warn('[net/host] destroyEntity (structure)', err); }
+  }
+
+  function handleStructureHarvestPlanter(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (structure.kind !== 'planter') return;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
+    if (!structure.crop || !structure.ready) return;
+    structure.crop = null;
+    structure.growth = 0;
+    structure.ready = false;
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#ffb562', 8, 28);
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: { pumpkin: 2 }, reason: 'harvest_planter' }),
+      peerId
+    );
+  }
+
+  // 钓鱼：MVP 仅在客户端"成功收线"时给奖励。host 校验玩家与浮标距离 + tile
+  // 类型 + 简单冷却，避免恶意 client 高频骗鱼。
+  function isFishableTile(t) { return t === 'water' || t === 'deep'; }
+  function rollFishingCatchHost(tile, dayTime) {
+    const night = dayTime > 0.78 || dayTime < 0.18;
+    const r = Math.random();
+    if (tile === 'deep') {
+      if (night && r < 0.24) return { eel: 1 };
+      if (r < 0.56) return { mackerel: 1 + (Math.random() < 0.5 ? 1 : 0) };
+      if (r < 0.88) return { sardine: 1 + (Math.random() < 0.5 ? 1 : 0) };
+      return { eel: 1 };
+    }
+    if (night && r < 0.12) return { eel: 1 };
+    if (r < 0.7) return { sardine: 1 + (Math.random() < 0.5 ? 1 : 0) };
+    if (r < 0.95) return { mackerel: 1 };
+    return { eel: 1 };
+  }
+
+  function handleFishReel(peerId, peerEntry, data) {
+    const x = Number(data.x) || 0;
+    const y = Number(data.y) || 0;
+    const tile = String(data.k || '');
+    if (!isFishableTile(tile)) return;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, x, y) > 132 + PEER_RANGE_SLACK) return;
+    // 用 host 端的 tileAtWorld 二次校验，避免 client 谎报 tile 类型
+    if (typeof game.tileAtWorld === 'function') {
+      const t = game.tileAtWorld(x, y);
+      if (!isFishableTile(t)) return;
+    }
+    const loot = rollFishingCatchHost(tile, state.time || 0);
+    if (Object.keys(loot).length === 0) return;
+    if (typeof burst === 'function') burst(x, y, '#b7f1ff', 8, 26);
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: loot, reason: 'fish' }),
+      peerId
+    );
+  }
+
   function handleActionReq(data, peerId) {
     if (!active || !state.running || state.over) return;
     if (!data || typeof data !== 'object' || !peerId) return;
     const peerEntry = state.players.get(peerId);
     if (!peerEntry) return;
 
-    // 简易速率限制：attack 与 build 共用一个 cooldown 桶，避免同一 peer 在
-    // 一帧内同时刷 attack+build。
+    // 简易速率限制：所有动作共用一个 cooldown 桶，避免同一 peer 在一帧内
+    // 同时刷多个 action（attack / build / interact 等）。
     const now = performance.now();
     const last = peerActionCooldown.get(peerId) || 0;
     if (now - last < PEER_ACTION_COOLDOWN_MS) {
       // build 被速率限制拒绝时也要退款，否则 client 端物品消失了
       if (data.a === 'build') {
         refundPeerBuild(peerId, typeof data.t === 'string' ? data.t : '', 'build_throttled');
+      } else if (data.a === 'refuel' || data.a === 'cook') {
+        // 这些动作 client 已扣除 1 wood / 1 fish；被节流时回退
+        const refund = {};
+        if (data.a === 'refuel') refund.wood = 1;
+        if (data.a === 'cook' && typeof data.tk === 'string' && data.tk) refund[data.tk] = 1;
+        refundPeerItems(peerId, refund, data.a + '_throttled');
+      } else if (data.a === 'interact') {
+        // plant 子动作有 seedPack 扣除；其它子动作（取水/添柴）也需要 wood 退回
+        const refund = {};
+        if (data.k === 'plant') refund.seedPack = 1;
+        else if (data.k === 'campfire') refund.wood = 1;
+        refundPeerItems(peerId, refund, 'interact_throttled');
+      } else if (data.a === 'repair' && typeof data.tk === 'string' && data.tk) {
+        try {
+          // tk 是 JSON 序列化的 cost 对象，client 在请求时塞进去
+          const cost = JSON.parse(data.tk);
+          if (cost && typeof cost === 'object') refundPeerItems(peerId, cost, 'repair_throttled');
+        } catch { /* ignore */ }
       }
       return;
     }
@@ -558,15 +787,47 @@
       handleBuildByPeer(peerId, peerEntry, data);
       return;
     }
-    if (data.a !== 'attack') return; // 其它动作类型留待后续
-    const target = resolveTargetByNetId(data.t);
-    if (!target) return;
-
-    const toolKey = typeof data.tk === 'string' ? data.tk : '';
-    if (target.group === 'resource') {
-      handleResourceAttackByPeer(peerId, target, peerEntry, toolKey);
-    } else if (target.group === 'enemy') {
-      handleEnemyAttackByPeer(peerId, target, peerEntry, toolKey);
+    if (data.a === 'attack') {
+      const target = resolveTargetByNetId(data.t);
+      if (!target) return;
+      const toolKey = typeof data.tk === 'string' ? data.tk : '';
+      if (target.group === 'resource') {
+        handleResourceAttackByPeer(peerId, target, peerEntry, toolKey);
+      } else if (target.group === 'enemy') {
+        handleEnemyAttackByPeer(peerId, target, peerEntry, toolKey);
+      }
+      return;
+    }
+    if (data.a === 'fishReel') {
+      handleFishReel(peerId, peerEntry, data);
+      return;
+    }
+    // 其余动作都是 structure 相关：t = 结构 netId
+    if (data.a === 'interact' || data.a === 'refuel' || data.a === 'drink' ||
+        data.a === 'cook' || data.a === 'repair' || data.a === 'dismantle' ||
+        data.a === 'harvestPlanter') {
+      const target = resolveTargetByNetId(data.t);
+      if (!target || target.group !== 'structure') {
+        // 找不到目标 → 把 client 已扣除的资源退回去
+        if (data.a === 'interact' && data.k === 'plant') refundPeerItems(peerId, { seedPack: 1 }, 'interact_no_target');
+        else if (data.a === 'interact' && data.k === 'campfire') refundPeerItems(peerId, { wood: 1 }, 'interact_no_target');
+        else if (data.a === 'refuel') refundPeerItems(peerId, { wood: 1 }, 'refuel_no_target');
+        else if (data.a === 'cook' && data.tk) refundPeerItems(peerId, { [data.tk]: 1 }, 'cook_no_target');
+        else if (data.a === 'repair' && data.tk) {
+          try { const cost = JSON.parse(data.tk); if (cost) refundPeerItems(peerId, cost, 'repair_no_target'); } catch { /* ignore */ }
+        }
+        return;
+      }
+      // 携带 client 扣除的物品 key（用于失败时退款）
+      if (data.a === 'cook') target.refundOnFail = data.tk || null;
+      if (data.a === 'interact') handleStructureInteract(peerId, peerEntry, target);
+      else if (data.a === 'refuel') handleStructureRefuel(peerId, peerEntry, target, data.k === 'all');
+      else if (data.a === 'drink') handleStructureDrink(peerId, peerEntry, target, data.k === 'all');
+      else if (data.a === 'cook') handleStructureCook(peerId, peerEntry, target);
+      else if (data.a === 'repair') handleStructureRepair(peerId, peerEntry, target);
+      else if (data.a === 'dismantle') handleStructureDismantle(peerId, peerEntry, target);
+      else if (data.a === 'harvestPlanter') handleStructureHarvestPlanter(peerId, peerEntry, target);
+      return;
     }
     // 状态变化通过下一个 ENTITY_DELTA tick 自动广播给所有 peer
   }
@@ -628,11 +889,46 @@
     peerActionCooldown.clear();
   }
 
+  // 房主主动踢人：给目标 peer 发 KICK，让其自行 leave。也立刻把它从 host
+  // 的 players 表里删除，避免再继续广播它的 ghost。
+  function kickPeer(peerId, reason = '被房主移出房间') {
+    if (!active || !peerId) return false;
+    try {
+      netTransport.send(NET_CHANNELS.KICK, game.netMakeKick({ reason }), peerId);
+    } catch (err) {
+      console.warn('[net/host] kick send error', err);
+    }
+    state.players.delete(peerId);
+    peerActionCooldown.delete(peerId);
+    return true;
+  }
+
+  // 房主主动转让：广播 HOST_TRANSFER 告知所有 peer 新房主身份，然后停掉
+  // 本机的 host 循环并切到 client。新房主接到后会自行调用 netHostStart。
+  function transferHostTo(peerId) {
+    if (!active || !peerId) return false;
+    const payload = game.netMakeHostTransfer({
+      peerId,
+      seed: state.seed,
+      day: state.day,
+      time: state.time,
+      voluntary: true
+    });
+    try {
+      netTransport.send(NET_CHANNELS.HOST_TRANSFER, payload);
+    } catch (err) {
+      console.warn('[net/host] transfer send error', err);
+    }
+    return true;
+  }
+
   Object.assign(game, {
     netHostStart: startHost,
     netHostStop: stopHost,
     netHostTick: hostTick,
     netHostBroadcastSnapshot: broadcastSnapshot,
-    netHostBroadcastEntityDelta: broadcastEntityDelta
+    netHostBroadcastEntityDelta: broadcastEntityDelta,
+    netHostKickPeer: kickPeer,
+    netHostTransferTo: transferHostTo
   });
 })(window.TidalIsle);

@@ -20,7 +20,9 @@
     ENTITY_DELTA: 'edlt', // Host -> Client：实体增量
     ACTION_REQ: 'actq',   // Client -> Host：行为请求（采集/攻击/建造/钓鱼...）
     ACTION_ACK: 'acta',   // Host -> Client：行为结果
-    INVENTORY: 'inv'      // Host -> Client：背包变更
+    INVENTORY: 'inv',     // Host -> Client：背包变更
+    KICK: 'kick',         // Host -> Client：把指定玩家踢出房间
+    HOST_TRANSFER: 'hxfr' // Host -> 所有 peer：宣告新房主（含元数据：seed/day/time）
   };
 
   const ROLES = {
@@ -71,6 +73,8 @@
 
   // Host -> Client：定时世界快照。MVP 只携带玩家位置 + 全局 day/time，
   // 其他实体（敌人、资源、建筑）仍由各端使用相同种子各自模拟。
+  // 输入预测 / 对账：每个 peer 项中 `q` 字段表示 Host 已处理的最后 input
+  // 序号（client 用来从 input 历史里丢弃已 ack 的项）。
   function makeSnapshot({ tick, day, time, players }) {
     return {
       k: tick | 0,
@@ -85,7 +89,8 @@
         f: peer.facing || 'down',
         m: peer.isMoving ? 1 : 0,
         a: Math.round((peer.animationTime || 0) * 100) / 100,
-        h: typeof peer.hp === 'number' ? Math.round(peer.hp) : -1
+        h: typeof peer.hp === 'number' ? Math.round(peer.hp) : -1,
+        q: typeof peer.ackSeq === 'number' ? (peer.ackSeq | 0) : 0
       }))
     };
   }
@@ -140,15 +145,17 @@
     };
   }
 
-  // Client -> Host：动作请求。MVP 阶段覆盖：
+  // Client -> Host：动作请求。覆盖：
   //   'attack' - 对目标实体的近战伤害（采集 / 攻击）
-  //              t = 目标 netId（'r:chunkKey:slot' / 'e:chunkKey:slot' / 'e:d:<id>'）
-  //              tk = 工具 key（用于 host 端计算伤害；与本地 getActiveToolKey 一致）
-  //              px/py - 客户端报告的玩家位置，host 用来做距离校验，避免越过墙打远处敌人
+  //              t = 目标 netId，tk = 工具 key，px/py 客户端报告的玩家位置
   //   'build'  - 放置一个建筑
-  //              t = 物品 key（如 'campfire_kit'）：host 校验失败时回发 INVENTORY 退款
-  //              k = buildKind（如 'campfire' / 'wall' / 'planter' / 'collector' / 'floor'）
-  //              x/y = 期望放置的世界坐标（tile 已 snap 过）
+  //              t = 物品 key，k = buildKind，x/y = 期望放置的世界坐标
+  //   'interact' / 'cook' / 'refuel' / 'drink' / 'repair' / 'dismantle' /
+  //   'plant' / 'harvestPlanter'
+  //              对结构的交互。t = 结构 netId；其它字段视动作而定（如 refuel/drink
+  //              的 k = 'all' 表示填满 / 畅饮）
+  //   'fishCast'  - t = tile 类型 ('water'/'deep')，x/y = 浮标世界坐标
+  //   'fishReel'  - 没有目标，host 端用自己的 fishing state 解算
   function makeActionReq({ action = 'attack', target = '', tool = '', kind = '', x = 0, y = 0 } = {}) {
     return {
       a: String(action),
@@ -169,6 +176,28 @@
     };
   }
 
+  // Host -> Client：踢人通知（仅发给目标 peer）。客户端收到后自动 leave。
+  function makeKick({ reason = '' } = {}) {
+    return {
+      r: String(reason || '').slice(0, 200),
+      ts: Date.now()
+    };
+  }
+
+  // Host -> 所有 peer：宣告新房主。携带必要的世界元数据让新房主无缝接管。
+  //   p = 新房主 peerId（接收者比对自己的 selfId 判断是否被升格）
+  //   s/d/t = 当前 seed / day / time（仅作为兜底，多数情况下 client 已经持有）
+  //   v = 主动转让 (1) 还是 host 掉线后自动迁移 (0)
+  function makeHostTransfer({ peerId, seed = null, day = null, time = null, voluntary = true } = {}) {
+    return {
+      p: String(peerId || ''),
+      s: typeof seed === 'number' ? seed : null,
+      d: typeof day === 'number' ? day : null,
+      t: typeof time === 'number' ? time : null,
+      v: voluntary ? 1 : 0
+    };
+  }
+
   Object.assign(game, {
     NET_PROTOCOL_VERSION: PROTOCOL_VERSION,
     NET_CHANNELS: CHANNELS,
@@ -180,6 +209,8 @@
     netMakeSnapshot: makeSnapshot,
     netMakeEntityDelta: makeEntityDelta,
     netMakeActionReq: makeActionReq,
-    netMakeInventoryUpdate: makeInventoryUpdate
+    netMakeInventoryUpdate: makeInventoryUpdate,
+    netMakeKick: makeKick,
+    netMakeHostTransfer: makeHostTransfer
   });
 })(window.TidalIsle);

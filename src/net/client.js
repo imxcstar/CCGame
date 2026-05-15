@@ -35,6 +35,17 @@
   let active = false;
   let worldReady = false;
 
+  // 输入预测 / 对账：保存最近 ~1.5s 的本地 input 历史，便于在收到 SNAPSHOT
+  // 中带回的 ack 序号时丢弃已确认的项，并在 host 报告的位置与历史不匹配
+  // 时执行 snap & replay。MVP 阶段 host 仍直接信任 client 上报的位置（即
+  // host 端没有真正的物理对账），所以正常情况下 history[i].x/y 会与 host
+  // 回传一致，不触发 reconcile。这套结构主要是为后续接入 host 端物理仿真
+  // 做铺垫。
+  const inputHistory = []; // [{ seq, x, y, ts }]
+  const INPUT_HISTORY_MAX = 30; // 30 帧 ≈ 2s @ 15Hz
+  // 漂移阈值：低于此值视为正常浮点抖动，不 snap。
+  const RECONCILE_THRESHOLD = 12;
+
   // 客户端的 netId -> 本地 entityId 映射。host 端用确定性 netId
   // (`r:chunkKey:slot`、`e:chunkKey:slot`) 标识所有 chunk-bound 实体，
   // 这些 entity 在 client 端由同种子的 chunk hydration 创建，可按
@@ -81,7 +92,13 @@
     const seen = new Set();
     if (Array.isArray(data.p)) {
       data.p.forEach((peer) => {
-        if (!peer || !peer.i || typeof peer.i !== 'string' || peer.i === selfId) return;
+        if (!peer || !peer.i || typeof peer.i !== 'string') return;
+        if (peer.i === selfId) {
+          // host 回送的本地玩家权威位置 + ack 序号；做输入预测对账
+          reconcileLocalPlayer(peer);
+          seen.add(peer.i);
+          return;
+        }
         const entry = ensurePeerEntry(peer.i, { name: peer.n, color: peer.c });
         if (!entry) return;
         entry.name = peer.n || entry.name;
@@ -102,6 +119,35 @@
         state.players.delete(id);
       }
     });
+  }
+
+  // 输入预测 / reconciliation：根据 host 回传的 ackSeq (peer.q) 与权威坐标
+  // (peer.x/peer.y) 修正本地玩家位置。
+  function reconcileLocalPlayer(peer) {
+    if (!peer || typeof peer.q !== 'number') return;
+    const ack = peer.q | 0;
+    if (ack <= 0) return;
+    // 找到本地历史中与 ack 对应的快照
+    let matchIdx = -1;
+    for (let i = 0; i < inputHistory.length; i += 1) {
+      if (inputHistory[i].seq === ack) { matchIdx = i; break; }
+      if (inputHistory[i].seq > ack) break;
+    }
+    // 裁掉所有 <= ack 的项
+    while (inputHistory.length > 0 && inputHistory[0].seq <= ack) {
+      inputHistory.shift();
+    }
+    if (matchIdx < 0) return;
+    // 比对历史位置与 host 报告位置
+    const transform = getComponent(state.playerId, 'transform');
+    if (!transform) return;
+    const drift = Math.hypot(peer.x - transform.x, peer.y - transform.y);
+    if (drift < RECONCILE_THRESHOLD) return;
+    // 漂移过大：snap 到 host 位置，剩余未 ack 的输入由本地 player update 自然续推。
+    // （注意：未来 host 引入物理对账后，应在此处把 transform 重置为 host 位置，
+    //  然后按 inputHistory 中残留的项再次本地模拟以保持手感。MVP 直接 snap。）
+    transform.x = peer.x;
+    transform.y = peer.y;
   }
 
   function bootstrapWorldFromHello(data) {
@@ -306,6 +352,9 @@
     if (!transform) return;
 
     inputSeq += 1;
+    // 记入本地历史，便于 reconcile
+    inputHistory.push({ seq: inputSeq, x: transform.x, y: transform.y, ts: performance.now() });
+    while (inputHistory.length > INPUT_HISTORY_MAX) inputHistory.shift();
     const payload = netMakeInput({
       seq: inputSeq,
       x: transform.x,
@@ -336,6 +385,20 @@
     }
     // 动态敌人：反查 remoteEnemyMap
     for (const [netId, localId] of remoteEnemyMap) {
+      if (localId === entityId) return netId;
+    }
+    return null;
+  }
+
+  // 结构 netId 反推。chunk-bound 用 chunkKey:slot；host 动态创建后下发到本地的
+  // 结构走 remoteStructureMap。
+  function localStructureNetId(entityId) {
+    const structure = getComponent(entityId, 'structure');
+    if (!structure) return null;
+    if (structure.fromChunk && structure.chunkKey && structure.slotIndex >= 0) {
+      return `s:${structure.chunkKey}:${structure.slotIndex}`;
+    }
+    for (const [netId, localId] of remoteStructureMap) {
       if (localId === entityId) return netId;
     }
     return null;
@@ -391,6 +454,48 @@
     return true;
   }
 
+  // 把对结构的交互请求发给 host。client 已在本地完成消耗品扣除 / 视觉反馈，
+  // 这里只负责派发；host 在校验失败时会通过 INVENTORY 回退已扣物品。
+  //   action: 'interact' | 'refuel' | 'drink' | 'cook' | 'repair' |
+  //           'dismantle' | 'harvestPlanter'
+  //   structureId: 本地 entityId（自动反推 netId）
+  //   options.kind: 用于扩展 'interact' / 'refuel' / 'drink' 等子动作的附加信息
+  //                 - interact 时填 structure.kind（plant 走 'planter' 时填 'plant'）
+  //                 - refuel/drink 时 'all' 表示填满 / 畅饮
+  //   options.tool: 用于 cook 时携带"被扣的鱼 key"，或 repair 时携带 cost JSON
+  function requestStructureAction(action, structureId, options = {}) {
+    if (!active || !worldReady) return false;
+    if (!action || !structureId) return false;
+    const netId = localStructureNetId(structureId);
+    if (!netId) return false;
+    const transform = getComponent(state.playerId, 'transform');
+    const payload = netMakeActionReq({
+      action,
+      target: netId,
+      tool: options.tool || '',
+      kind: options.kind || '',
+      x: transform?.x || 0,
+      y: transform?.y || 0
+    });
+    netTransport.send(NET_CHANNELS.ACTION_REQ, payload);
+    return true;
+  }
+
+  // 钓鱼收线：把 (tile, x, y) 上报给 host，host 校验后通过 INVENTORY 下发战利品。
+  function requestFishReel(tile, x, y) {
+    if (!active || !worldReady) return false;
+    if (!tile) return false;
+    const payload = netMakeActionReq({
+      action: 'fishReel',
+      target: '',
+      kind: tile,
+      x,
+      y
+    });
+    netTransport.send(NET_CHANNELS.ACTION_REQ, payload);
+    return true;
+  }
+
   function applyInventoryUpdate(data) {
     if (!active || !worldReady || !data || typeof data !== 'object') return;
     const items = data.it;
@@ -422,12 +527,47 @@
     applyInventoryUpdate(data);
   });
 
+  // 被房主踢出：尽快 leave 房间并提示玩家。
+  netTransport.subscribe(NET_CHANNELS.KICK, (data) => {
+    if (!active) return;
+    const reason = (data && typeof data.r === 'string' && data.r) || '被房主移出房间';
+    game.showMessage?.('已被踢出：' + reason, 3.2);
+    // 不直接调 leave；交给 session 层执行，保证 UI 状态同步
+    if (game.netSession?.leave) {
+      Promise.resolve().then(() => game.netSession.leave()).catch(() => { /* ignore */ });
+    }
+  });
+
+  // 房主转让：所有 peer 都会收到。被指定为新房主的 peer 切到 host 角色，
+  // 其他 peer 继续作为 client，但要更新自己的 session.peers 中谁是 host。
+  netTransport.subscribe(NET_CHANNELS.HOST_TRANSFER, (data, peerId) => {
+    if (!active || !data || typeof data !== 'object') return;
+    const newHostId = data.p;
+    if (!newHostId) return;
+    const selfId = netTransport.getSelfId();
+    if (newHostId === selfId) {
+      // 自己被升格为新房主：保留本地世界（已经与原 host 同步），停掉 client，
+      // 启动 host 循环。session 层会负责更新 UI 与发出 HELLO。
+      game.netSession?.acceptHostPromotion?.({
+        fromPeerId: peerId,
+        seed: data.s,
+        day: data.d,
+        time: data.t,
+        voluntary: data.v === 1
+      });
+    } else {
+      // 其他 peer：更新 session 里谁是 host
+      game.netSession?.notePeerIsHost?.(newHostId);
+    }
+  });
+
   function startClient() {
     if (active) return;
     active = true;
     worldReady = false;
     inputAcc = 0;
     inputSeq = 0;
+    inputHistory.length = 0;
     state.netMode = 'client';
     state.netTick = 0;
     state.players.clear();
@@ -447,6 +587,7 @@
     active = false;
     worldReady = false;
     inputAcc = 0;
+    inputHistory.length = 0;
     state.netMode = 'single';
     state.players.clear();
     remoteResourceMap.clear();
@@ -455,11 +596,29 @@
     state.netTick = 0;
   }
 
+  // 当本机被升格为新房主时：保留当前世界状态（已通过 SNAPSHOT/ENTITY_DELTA
+  // 与原 host 同步），把本地映射表里的 chunk-bound 实体重新登记为"自己"
+  // 拥有的实体。MVP 阶段直接复用 client 端已经建出来的本地实体，只是不再
+  // 接收 SNAPSHOT/ENTITY_DELTA 而是自己发。
+  function detachClientForPromotion() {
+    if (!active) return;
+    active = false;
+    worldReady = false;
+    inputAcc = 0;
+    inputHistory.length = 0;
+    // 注意：不 clear remoteXxxMap、不 clear state.players，因为新 host 接管时
+    // 还要看到当前世界上的远端 ghost 玩家。
+    state.netTick = 0;
+  }
+
   Object.assign(game, {
     netClientStart: startClient,
     netClientStop: stopClient,
     netClientTick: clientTick,
     netClientRequestAttack: requestPrimaryAttack,
-    netClientRequestPlaceStructure: requestPlaceStructure
+    netClientRequestPlaceStructure: requestPlaceStructure,
+    netClientRequestStructureAction: requestStructureAction,
+    netClientRequestFishReel: requestFishReel,
+    netClientDetachForPromotion: detachClientForPromotion
   });
 })(window.TidalIsle);
