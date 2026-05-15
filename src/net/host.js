@@ -382,12 +382,13 @@
     return null;
   }
 
-  // 客户端 peer 的简易 attack cooldown，避免他刷网络包打超快。
+  // 客户端 peer 的简易动作 cooldown，避免他刷网络包打超快。
   // 与 action-system.js 中的本地 attackCooldown (0.26s = 260ms) 对齐：
   // 服务端略宽容 20ms 以容忍网络抖动，既能拦截恶意客户端的高频请求，
-  // 又不会拒绝正常节奏的合法包。
-  const peerActionCooldown = new Map(); // peerId -> last attack timestamp (ms)
-  const PEER_ATTACK_COOLDOWN_MS = 240;
+  // 又不会拒绝正常节奏的合法包。attack 与 build 共享同一个桶（同一 peer
+  // 不该同帧又打又造）。
+  const peerActionCooldown = new Map(); // peerId -> last action timestamp (ms)
+  const PEER_ACTION_COOLDOWN_MS = 240;
   // 距离校验的延迟容忍量：远端玩家的位置以 ~15Hz INPUT 上报，
   // 在 ATTACK_RANGE + collider.radius 的基础上再放宽 PEER_RANGE_SLACK
   // 像素，避免合法攻击因为 ghost 还没更新而被服务端拒绝。
@@ -544,7 +545,7 @@
     // 一帧内同时刷 attack+build。
     const now = performance.now();
     const last = peerActionCooldown.get(peerId) || 0;
-    if (now - last < PEER_ATTACK_COOLDOWN_MS) {
+    if (now - last < PEER_ACTION_COOLDOWN_MS) {
       // build 被速率限制拒绝时也要退款，否则 client 端物品消失了
       if (data.a === 'build') {
         refundPeerBuild(peerId, typeof data.t === 'string' ? data.t : '', 'build_throttled');
