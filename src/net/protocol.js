@@ -126,6 +126,30 @@
     };
   }
 
+  // Client -> Host：动作请求。MVP 阶段只覆盖"对目标实体的近战伤害"（采集 / 攻击）。
+  //   a   - 动作类型：'attack'（其它如 'use'/'build' 留给后续）
+  //   t   - 目标 netId（'r:chunkKey:slot' / 'e:chunkKey:slot' / 'e:d:<id>'）
+  //   tk  - 工具 key（用于 host 端计算伤害；与本地 getActiveToolKey 一致）
+  //   px/py - 客户端报告的玩家位置，host 用来做距离校验，避免越过墙打远处敌人
+  function makeActionReq({ action = 'attack', target = '', tool = '', x = 0, y = 0 } = {}) {
+    return {
+      a: String(action),
+      t: String(target || ''),
+      tk: String(tool || ''),
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10
+    };
+  }
+
+  // Host -> Client：定向背包补丁。MVP 只用作"动作产出的战利品 += "。
+  //   it - { itemKey: count, ... }；客户端调用 addItemsToInventory 即可。
+  function makeInventoryUpdate({ items = {}, reason = '' } = {}) {
+    return {
+      it: items || {},
+      r: String(reason || '')
+    };
+  }
+
   Object.assign(game, {
     NET_PROTOCOL_VERSION: PROTOCOL_VERSION,
     NET_CHANNELS: CHANNELS,
@@ -135,6 +159,8 @@
     netMakeChat: makeChat,
     netMakeInput: makeInput,
     netMakeSnapshot: makeSnapshot,
-    netMakeEntityDelta: makeEntityDelta
+    netMakeEntityDelta: makeEntityDelta,
+    netMakeActionReq: makeActionReq,
+    netMakeInventoryUpdate: makeInventoryUpdate
   });
 })(window.TidalIsle);

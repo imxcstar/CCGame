@@ -23,12 +23,24 @@
     netTransport,
     NET_CHANNELS,
     NET_ROLES,
+    ATTACK_RANGE,
     netMakeSnapshot,
     netMakeEntityDelta,
+    netMakeInventoryUpdate,
     getComponent,
     getResourceIds,
     getEnemyIds,
-    getEntityConfig
+    getEntityConfig,
+    getEnemyConfig,
+    getResourceDamage,
+    getEnemyDamage,
+    rollLoot,
+    rollEnemyMeat,
+    dist,
+    burst,
+    destroyEntity,
+    removeChunkEnemyEntity,
+    randomBetween
   } = game;
   // 注意：netSession 在 session.js 中创建，加载顺序晚于本模块；运行期通过
   // game.netSession 懒读取，避免 TDZ。
@@ -266,6 +278,142 @@
     }
   }
 
+  // ---------------- ACTION_REQ -> INVENTORY ----------------
+
+  // 解析 client 发来的 netId，返回 host 端的本地 entityId 与 group。
+  // 规则与上面 enemyNetId / resourceNetId 对称：
+  //   r:<chunkKey>:<slot>     -> chunk.loadedResourceIds[slot]
+  //   e:<chunkKey>:<slot>     -> chunk.loadedEnemyIds[slot]
+  //   e:d:<entityId>          -> 直接 parse 出 host 本地 entityId
+  function resolveTargetByNetId(netId) {
+    if (typeof netId !== 'string' || !netId) return null;
+    if (netId.startsWith('r:')) {
+      const rest = netId.slice(2);
+      const lastColon = rest.lastIndexOf(':');
+      if (lastColon < 0) return null;
+      const chunkKey = rest.slice(0, lastColon);
+      const slot = parseInt(rest.slice(lastColon + 1), 10);
+      const chunk = state.world?.chunks?.get(chunkKey);
+      if (!chunk || !Array.isArray(chunk.loadedResourceIds)) return null;
+      const id = chunk.loadedResourceIds[slot];
+      return id ? { group: 'resource', id } : null;
+    }
+    if (netId.startsWith('e:d:')) {
+      const id = parseInt(netId.slice(4), 10);
+      if (!Number.isFinite(id)) return null;
+      // 防御性：仅在该 id 仍是活敌人时才返回（否则可能是已销毁的旧 id）
+      if (!getEnemyIds().includes(id)) return null;
+      return { group: 'enemy', id };
+    }
+    if (netId.startsWith('e:')) {
+      const rest = netId.slice(2);
+      const lastColon = rest.lastIndexOf(':');
+      if (lastColon < 0) return null;
+      const chunkKey = rest.slice(0, lastColon);
+      const slot = parseInt(rest.slice(lastColon + 1), 10);
+      const chunk = state.world?.chunks?.get(chunkKey);
+      if (!chunk || !Array.isArray(chunk.loadedEnemyIds)) return null;
+      const id = chunk.loadedEnemyIds[slot];
+      return id ? { group: 'enemy', id } : null;
+    }
+    return null;
+  }
+
+  // 客户端 peer 的简易 attack cooldown，避免他刷网络包打超快
+  const peerActionCooldown = new Map(); // peerId -> last attack timestamp (ms)
+  const PEER_ATTACK_COOLDOWN_MS = 220;
+
+  function handleResourceAttackByPeer(peerId, target, peerEntry, toolKey) {
+    const transform = getComponent(target.id, 'transform');
+    const health = getComponent(target.id, 'health');
+    const node = getComponent(target.id, 'resourceNode');
+    if (!transform || !health || !node?.alive) return;
+
+    // 距离校验：使用 client 报告的位置（peerEntry.x/y），加少量宽容值。
+    const collider = getComponent(target.id, 'collider');
+    const radius = collider?.radius || 0;
+    const distance = dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y);
+    if (distance > ATTACK_RANGE + radius + 24) return; // +24 容忍 ghost 延迟
+
+    const damage = getResourceDamage(toolKey, target.id);
+    health.hp -= damage;
+    health.hitTimer = 0.18;
+
+    if (health.hp <= 0) {
+      const config = getEntityConfig(node.kind);
+      if (!config) return;
+      const loot = rollLoot(config.loot);
+      node.alive = false;
+      node.respawnTimer = config.respawn * randomBetween(0.85, 1.2);
+      health.hp = 0;
+      health.hitTimer = 0;
+      if (config.burst) burst(transform.x, transform.y, config.burst.color, config.burst.count);
+      if (Object.keys(loot).length > 0) {
+        netTransport.send(
+          NET_CHANNELS.INVENTORY,
+          netMakeInventoryUpdate({ items: loot, reason: 'harvest' }),
+          peerId
+        );
+      }
+    }
+  }
+
+  function handleEnemyAttackByPeer(peerId, target, peerEntry, toolKey) {
+    const transform = getComponent(target.id, 'transform');
+    const health = getComponent(target.id, 'health');
+    const enemy = getComponent(target.id, 'enemy');
+    if (!transform || !health || !enemy) return;
+
+    const collider = getComponent(target.id, 'collider');
+    const radius = collider?.radius || 0;
+    const distance = dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y);
+    if (distance > ATTACK_RANGE + radius + 24) return;
+
+    const damage = getEnemyDamage(toolKey, target.id);
+    health.hp -= damage;
+    health.hitTimer = 0.18;
+    burst(transform.x, transform.y, '#ff7a8d', 5, 50);
+
+    if (health.hp <= 0) {
+      const meat = rollEnemyMeat(enemy.kind);
+      burst(transform.x, transform.y, '#ffd37c', 10, 70);
+      if (meat > 0) {
+        netTransport.send(
+          NET_CHANNELS.INVENTORY,
+          netMakeInventoryUpdate({ items: { meat }, reason: 'kill' }),
+          peerId
+        );
+      }
+      try { removeChunkEnemyEntity?.(target.id); } catch (err) { console.warn('[net/host] removeChunkEnemyEntity', err); }
+      try { destroyEntity(target.id); } catch (err) { console.warn('[net/host] destroyEntity', err); }
+    }
+  }
+
+  function handleActionReq(data, peerId) {
+    if (!active || !state.running || state.over) return;
+    if (!data || typeof data !== 'object' || !peerId) return;
+    const peerEntry = state.players.get(peerId);
+    if (!peerEntry) return;
+
+    // 简易速率限制
+    const now = performance.now();
+    const last = peerActionCooldown.get(peerId) || 0;
+    if (now - last < PEER_ATTACK_COOLDOWN_MS) return;
+    peerActionCooldown.set(peerId, now);
+
+    if (data.a !== 'attack') return; // MVP 仅 attack；其它动作类型留待后续
+    const target = resolveTargetByNetId(data.t);
+    if (!target) return;
+
+    const toolKey = typeof data.tk === 'string' ? data.tk : '';
+    if (target.group === 'resource') {
+      handleResourceAttackByPeer(peerId, target, peerEntry, toolKey);
+    } else if (target.group === 'enemy') {
+      handleEnemyAttackByPeer(peerId, target, peerEntry, toolKey);
+    }
+    // 状态变化通过下一个 ENTITY_DELTA tick 自动广播给所有 peer
+  }
+
   function onPeerJoin(peerId) {
     if (!active) return;
     ensurePeerEntry(peerId);
@@ -277,11 +425,15 @@
   function onPeerLeave(peerId) {
     if (!active) return;
     state.players.delete(peerId);
+    peerActionCooldown.delete(peerId);
   }
 
   // 一次性订阅：transport 的订阅在 session 初始化时已建好通道，这里加 handler。
   netTransport.subscribe(NET_CHANNELS.INPUT, (data, peerId) => {
     handleInput(data, peerId);
+  });
+  netTransport.subscribe(NET_CHANNELS.ACTION_REQ, (data, peerId) => {
+    handleActionReq(data, peerId);
   });
   netTransport.onPeerJoin(onPeerJoin);
   netTransport.onPeerLeave(onPeerLeave);
@@ -315,6 +467,7 @@
     entityDeltaAcc = 0;
     prevEnemyNetIds = new Set();
     prevDirtyResourceNetIds = new Set();
+    peerActionCooldown.clear();
   }
 
   Object.assign(game, {

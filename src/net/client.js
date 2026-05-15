@@ -22,6 +22,7 @@
     NET_CHANNELS,
     NET_ROLES,
     netMakeInput,
+    netMakeActionReq,
     getComponent,
     getResourceIds,
     getEnemyIds
@@ -249,6 +250,75 @@
     netTransport.send(NET_CHANNELS.INPUT, payload);
   }
 
+  // ---------------- ACTION_REQ / INVENTORY ----------------
+
+  // 给一个本地 entityId 反推它的 netId。规则与 host 端的 resourceNetId /
+  // enemyNetId 对称：chunk-bound 用 chunkKey:slot；动态敌人用反查 remoteEnemyMap。
+  function localResourceNetId(entityId) {
+    const node = getComponent(entityId, 'resourceNode');
+    if (!node?.chunkKey || node.slotIndex < 0) return null;
+    return `r:${node.chunkKey}:${node.slotIndex}`;
+  }
+
+  function localEnemyNetId(entityId) {
+    const enemy = getComponent(entityId, 'enemy');
+    if (!enemy) return null;
+    if (enemy.fromChunk && enemy.chunkKey && enemy.slotIndex >= 0) {
+      return `e:${enemy.chunkKey}:${enemy.slotIndex}`;
+    }
+    // 动态敌人：反查 remoteEnemyMap
+    for (const [netId, localId] of remoteEnemyMap) {
+      if (localId === entityId) return netId;
+    }
+    return null;
+  }
+
+  // 把本地 attack 目标 + 工具发给 host。返回 true 表示已派发。
+  function requestPrimaryAttack() {
+    if (!active || !worldReady) return false;
+    const getAttackTarget = game.getAttackTarget;
+    const getActiveToolKey = game.getActiveToolKey;
+    if (typeof getAttackTarget !== 'function') return false;
+
+    const target = getAttackTarget();
+    if (!target) return false;
+
+    const netId = target.group === 'resource'
+      ? localResourceNetId(target.id)
+      : localEnemyNetId(target.id);
+    if (!netId) return false;
+
+    const transform = getComponent(state.playerId, 'transform');
+    const payload = netMakeActionReq({
+      action: 'attack',
+      target: netId,
+      tool: typeof getActiveToolKey === 'function' ? (getActiveToolKey() || '') : '',
+      x: transform?.x || 0,
+      y: transform?.y || 0
+    });
+    netTransport.send(NET_CHANNELS.ACTION_REQ, payload);
+    // 客户端不做 reconcile：状态变化会经由 ENTITY_DELTA 回来。这里仅给一点
+    // 命中反馈让玩家看到自己确实出手了（与 host 端 burst 是双端各画一次）。
+    if (transform && typeof game.burst === 'function') {
+      game.burst(transform.x, transform.y, 'rgba(230,245,255,0.8)', 3, 30);
+    }
+    return true;
+  }
+
+  function applyInventoryUpdate(data) {
+    if (!active || !worldReady || !data || typeof data !== 'object') return;
+    const items = data.it;
+    if (!items || typeof items !== 'object') return;
+    if (typeof game.addInventory !== 'function') return;
+    const result = game.addInventory(items);
+    // 弹一条简短提示，复用 host harvest/kill 的视觉反馈。
+    const RESOURCE_NAMES = game.RESOURCE_NAMES || {};
+    const text = Object.entries(result?.added || {})
+      .map(([key, value]) => '+' + value + ' ' + (RESOURCE_NAMES[key] || key))
+      .join(' ');
+    if (text) game.showMessage?.(text);
+  }
+
   // 在 transport 上挂"持久订阅"。session 的 HELLO 处理是另一套（写入
   // peers 列表）；这里专门拿 HELLO 的 seed 字段做世界 bootstrap。
   netTransport.subscribe(NET_CHANNELS.HELLO, (data) => {
@@ -261,6 +331,9 @@
   });
   netTransport.subscribe(NET_CHANNELS.ENTITY_DELTA, (data) => {
     applyEntityDelta(data);
+  });
+  netTransport.subscribe(NET_CHANNELS.INVENTORY, (data) => {
+    applyInventoryUpdate(data);
   });
 
   function startClient() {
@@ -297,6 +370,7 @@
   Object.assign(game, {
     netClientStart: startClient,
     netClientStop: stopClient,
-    netClientTick: clientTick
+    netClientTick: clientTick,
+    netClientRequestAttack: requestPrimaryAttack
   });
 })(window.TidalIsle);
