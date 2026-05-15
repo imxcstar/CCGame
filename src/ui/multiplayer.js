@@ -61,6 +61,7 @@
       if (a.isHost !== b.isHost) return a.isHost ? -1 : 1;
       return a.joinedAt - b.joinedAt;
     });
+    const localIsHost = netSession.isHost();
     dom.mpPeerList.innerHTML = '';
     peers.forEach((peer) => {
       const li = document.createElement('li');
@@ -97,6 +98,44 @@
         latency.textContent = '—';
       }
       li.appendChild(latency);
+
+      // 房主控制：可以踢人 / 转让房主（对非自己的远端 peer 显示）
+      if (localIsHost && !peer.isLocal) {
+        // 对话框里只显示纯文本：去掉控制字符并限长，避免奇怪昵称把提示撑爆
+        const displayName = String(peer.name || '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24) || peer.id.slice(0, 4);
+        const actions = document.createElement('span');
+        actions.className = 'mp-peer-actions';
+
+        const transferBtn = document.createElement('button');
+        transferBtn.type = 'button';
+        transferBtn.className = 'mp-mini-btn mp-peer-action';
+        transferBtn.textContent = '转让';
+        transferBtn.title = '把房主转让给该玩家';
+        transferBtn.addEventListener('click', () => {
+          if (!window.confirm(`确认把房主转让给 ${displayName}？`)) return;
+          game.playSound?.('click');
+          try { netSession.transferHostTo(peer.id); } catch (err) {
+            console.warn('[mp ui] transfer error', err);
+          }
+        });
+        actions.appendChild(transferBtn);
+
+        const kickBtn = document.createElement('button');
+        kickBtn.type = 'button';
+        kickBtn.className = 'mp-mini-btn mp-peer-action danger';
+        kickBtn.textContent = '踢出';
+        kickBtn.title = '把该玩家移出房间';
+        kickBtn.addEventListener('click', () => {
+          if (!window.confirm(`确认把 ${displayName} 移出房间？`)) return;
+          game.playSound?.('click');
+          try { netSession.kickPeer(peer.id); } catch (err) {
+            console.warn('[mp ui] kick error', err);
+          }
+        });
+        actions.appendChild(kickBtn);
+
+        li.appendChild(actions);
+      }
 
       dom.mpPeerList.appendChild(li);
     });

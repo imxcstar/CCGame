@@ -164,6 +164,21 @@
       return false;
     }
 
+    // 联机 client：把"收线成功"上报 host，host 校验后通过 INVENTORY 下发战利品
+    // （走和单机相同的播报路径）。本地仍清掉 fishing 状态，体感和单机一致。
+    if (state.netMode === 'client' && typeof game.netClientRequestFishReel === 'function') {
+      const tile = state.fishing.tile;
+      const fx = state.fishing.x;
+      const fy = state.fishing.y;
+      burst(fx, fy, '#b7f1ff', 6, 22);
+      state.shake = Math.max(state.shake, 1.2);
+      resetFishingState();
+      game.netClientRequestFishReel(tile, fx, fy);
+      // host 返回 INVENTORY 时会弹"+N 鱼名"的消息；这里只给一个抽线声/视觉。
+      game.playSound?.('catch');
+      return true;
+    }
+
     const loot = rollFishingCatch(state.fishing.tile);
     if (!canStoreAllItems(player.inventory, loot)) {
       burst(state.fishing.x, state.fishing.y, '#b7f1ff', 5, 18);
@@ -379,6 +394,20 @@
     return cost;
   }
 
+  // ---------- 联机 client 模式 helper ----------
+  // 在 client 模式下，对世界状态的修改不能在本地直接进行（host 是权威）。
+  // 我们把请求转发给 host 并提供与单机相同的"扣除消耗品 + 本地反馈"。
+  // host 端会通过 ENTITY_DELTA 同步真实状态、并在动作失败时通过 INVENTORY
+  // 退回已扣的物品（参考 net/host.js 中的 handleActionReq）。
+  function isClientMode() {
+    return state.netMode === 'client';
+  }
+
+  function dispatchStructureActionReq(action, structureId, options) {
+    if (typeof game.netClientRequestStructureAction !== 'function') return false;
+    return game.netClientRequestStructureAction(action, structureId, options || {}) === true;
+  }
+
   function interactWithStructure(structureId) {
     const player = getPlayerSnapshot();
     const transform = getComponent(structureId, 'transform');
@@ -396,6 +425,14 @@
       }
 
       removeItemFromInventory(player.inventory, 'wood', 1);
+      // 联机 client：把"添柴"请求发给 host；本地不直接改 fuel，让 ENTITY_DELTA 回流
+      if (isClientMode()) {
+        burst(transform.x, transform.y, '#ffca74', 6, 28);
+        game.playSound?.('fire');
+        showMessage('已请求添柴');
+        dispatchStructureActionReq('interact', structureId, { kind: 'campfire' });
+        return true;
+      }
       structure.fuel = Math.min(120, (structure.fuel || 0) + 28);
       burst(transform.x, transform.y, '#ffca74', 6, 28);
       game.playSound?.('fire');
@@ -410,6 +447,18 @@
         return false;
       }
 
+      if (isClientMode()) {
+        // 联机：客户端先在本地把 ghost 的 water 扣 1，立刻给到 thirst/energy 反馈，
+        // 然后让 host 校验并广播权威值（如校验失败会通过下一帧 ENTITY_DELTA 回滚 water）。
+        structure.water -= 1;
+        player.survival.thirst = Math.min(100, player.survival.thirst + 34);
+        player.survival.energy = Math.min(100, player.survival.energy + 6);
+        burst(transform.x, transform.y, '#81e7ff', 7, 30);
+        game.playSound?.('drink');
+        showMessage('取水成功');
+        dispatchStructureActionReq('interact', structureId, { kind: 'collector' });
+        return true;
+      }
       structure.water -= 1;
       player.survival.thirst = Math.min(100, player.survival.thirst + 34);
       player.survival.energy = Math.min(100, player.survival.energy + 6);
@@ -427,6 +476,13 @@
         }
 
         removeItemFromInventory(player.inventory, 'seedPack', 1);
+        if (isClientMode()) {
+          burst(transform.x, transform.y, '#9fd77c', 6, 24);
+          game.playSound?.('build');
+          showMessage('已请求播种');
+          dispatchStructureActionReq('interact', structureId, { kind: 'plant' });
+          return true;
+        }
         structure.crop = 'pumpkin';
         structure.growth = 0;
         structure.ready = false;
@@ -448,6 +504,13 @@
         return false;
       }
 
+      if (isClientMode()) {
+        burst(transform.x, transform.y, '#ffb562', 8, 28);
+        game.playSound?.('harvest');
+        showMessage('已请求收获');
+        dispatchStructureActionReq('harvestPlanter', structureId);
+        return true;
+      }
       addInventory(harvestLoot);
       structure.crop = null;
       structure.growth = 0;
@@ -485,6 +548,13 @@
     }
 
     removeItemFromInventory(player.inventory, fishKey, 1);
+    if (isClientMode()) {
+      burst(transform.x, transform.y, '#ffc887', 7, 28);
+      game.playSound?.('fire');
+      showMessage('已请求烹饪：烤鱼');
+      dispatchStructureActionReq('cook', structureId, { tool: fishKey });
+      return true;
+    }
     structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
     addInventory({ grilledFish: 1 });
     burst(transform.x, transform.y, '#ffc887', 7, 28);
@@ -518,6 +588,15 @@
 
     const woodToUse = fillAll ? Math.min(availableWood, Math.ceil(missingFuel / 28)) : 1;
     removeItemFromInventory(player.inventory, 'wood', woodToUse);
+    if (isClientMode()) {
+      burst(transform.x, transform.y, '#ffca74', 6 + woodToUse, 28 + woodToUse * 3);
+      game.playSound?.('fire');
+      showMessage(fillAll ? '已请求添满柴火' : '已请求添柴 +' + woodToUse);
+      // 注意：host 端 refuel 仅按"all=Math.ceil(missingFuel/28) 或 1"扣除，
+      // 因此服务端可能与本地实际使用的木柴数量略有差异（极端情况下）。MVP 不处理这层差异。
+      dispatchStructureActionReq('refuel', structureId, { kind: fillAll ? 'all' : '' });
+      return true;
+    }
     structure.fuel = Math.min(120, (structure.fuel || 0) + woodToUse * 28);
     burst(transform.x, transform.y, '#ffca74', 6 + woodToUse, 28 + woodToUse * 3);
     game.playSound?.('fire');
@@ -542,6 +621,17 @@
     }
 
     const amount = all ? Math.max(1, Math.min(structure.water || 0, Math.ceil((100 - player.survival.thirst) / 26))) : 1;
+    if (isClientMode()) {
+      // 与 interact-collector 同理：本地立刻给反馈，host 校验并广播权威值
+      structure.water -= amount;
+      player.survival.thirst = Math.min(100, player.survival.thirst + amount * 34);
+      player.survival.energy = Math.min(100, player.survival.energy + amount * 6);
+      burst(transform.x, transform.y, '#81e7ff', 6 + amount, 30 + amount * 2);
+      game.playSound?.('drink');
+      showMessage(all ? '畅饮了 ' + amount + ' 份淡水' : '取水成功');
+      dispatchStructureActionReq('drink', structureId, { kind: all ? 'all' : '' });
+      return true;
+    }
     structure.water -= amount;
     player.survival.thirst = Math.min(100, player.survival.thirst + amount * 34);
     player.survival.energy = Math.min(100, player.survival.energy + amount * 6);
@@ -574,6 +664,16 @@
     }
 
     spendInventoryCost(player.inventory, repairCost);
+    if (isClientMode()) {
+      burst(transform.x, transform.y, '#93f59a', 8, 34);
+      game.playSound?.('build');
+      showMessage('已请求修理');
+      // 把 cost JSON 通过 tool 字段透传，方便 host 在校验失败时退款
+      let costJson = '';
+      try { costJson = JSON.stringify(repairCost); } catch { /* ignore */ }
+      dispatchStructureActionReq('repair', structureId, { tool: costJson });
+      return true;
+    }
     health.hp = health.maxHp;
     burst(transform.x, transform.y, '#93f59a', 8, 34);
     game.playSound?.('build');
@@ -597,6 +697,17 @@
     if (!canStoreAllItems(player.inventory, { [structure.kind]: 1 })) {
       showMessage('背包空间不足');
       return false;
+    }
+
+    if (isClientMode()) {
+      // 联机：让 host 拆除结构并通过 INVENTORY 把物品发回来。本地不直接销毁，
+      // 而是等 ENTITY_DELTA 把结构标记为消失。
+      burst(transform.x, transform.y, '#83f5ce', 10, 42);
+      game.playSound?.('drop');
+      showMessage('已请求拆卸 ' + (getStructureConfig(structure.kind)?.name || getItemConfig(structure.kind).name));
+      dispatchStructureActionReq('dismantle', structureId);
+      clearSelectedWorldTarget();
+      return true;
     }
 
     removeChunkStructureEntity?.(structureId);
@@ -628,6 +739,13 @@
     player.player.attackCooldown = 0.26;
     burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
     state.shake = Math.max(state.shake, 4);
+
+    // 联机 client：转发给 host，由 host 进行权威伤害结算与战利品分发。
+    if (isClientMode() && typeof game.netClientRequestAttack === 'function') {
+      game.netClientRequestAttack();
+      return true;
+    }
+
     health.hp -= getResourceDamage('hands', resourceId);
     health.hitTimer = 0.18;
     game.playSound?.('chop');
@@ -655,6 +773,13 @@
     player.player.attackCooldown = 0.26;
     burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
     state.shake = Math.max(state.shake, 4);
+
+    // 联机 client：转发给 host，由 host 进行权威伤害结算。
+    if (isClientMode() && typeof game.netClientRequestAttack === 'function') {
+      game.netClientRequestAttack();
+      return true;
+    }
+
     hitEnemy(enemyId, getEnemyDamage('hands', enemyId));
     if (!getComponent(enemyId, 'enemy')) clearSelectedWorldTarget();
     return true;

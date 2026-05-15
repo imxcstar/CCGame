@@ -1493,6 +1493,27 @@ body.touch-mode .mobile-controls {
   color: var(--text-color-secondary);
 }
 
+.mp-peer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.mp-peer-action {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.mp-peer-action.danger {
+  background: #ffe1e1;
+  color: var(--error-color-active);
+}
+
+.mp-peer-action.danger:hover {
+  background: #ffc9c9;
+}
+
 .mp-chat-log {
   height: 180px;
   overflow-y: auto;
