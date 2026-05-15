@@ -373,6 +373,24 @@
     return true;
   }
 
+  // 把客户端的建造请求发给 host：host 在校验通过后会创建实体并通过下一个
+  // ENTITY_DELTA 的 `s` 字段同步给所有人（包括本 client）。校验失败时 host
+  // 会回发 INVENTORY 退款。注意 inventory 扣除在 building.js 中已经本地完成，
+  // 这里只负责派发请求。
+  function requestPlaceStructure(itemKey, kind, x, y) {
+    if (!active || !worldReady) return false;
+    if (!itemKey || !kind) return false;
+    const payload = netMakeActionReq({
+      action: 'build',
+      target: itemKey,
+      kind,
+      x,
+      y
+    });
+    netTransport.send(NET_CHANNELS.ACTION_REQ, payload);
+    return true;
+  }
+
   function applyInventoryUpdate(data) {
     if (!active || !worldReady || !data || typeof data !== 'object') return;
     const items = data.it;
@@ -441,6 +459,7 @@
     netClientStart: startClient,
     netClientStop: stopClient,
     netClientTick: clientTick,
-    netClientRequestAttack: requestPrimaryAttack
+    netClientRequestAttack: requestPrimaryAttack,
+    netClientRequestPlaceStructure: requestPlaceStructure
   });
 })(window.TidalIsle);

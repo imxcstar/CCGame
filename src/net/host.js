@@ -459,19 +459,105 @@
     }
   }
 
+  // 建造距离上限（与 building.js 的 canPlaceStructure 中 118 对齐，加一点宽容）
+  const PEER_BUILD_RANGE = 118 + PEER_RANGE_SLACK;
+
+  // 服务端对建造请求的校验：取代 building.js#canPlaceStructure 中"以本地玩家
+  // 为参照"的部分，改成以 peer 上报的 ghost 位置为参照。复用 game 上的
+  // tileAtWorld / tileWalkable / canStructureOverlap 等只读工具。
+  function canPeerPlaceStructure(peerEntry, kind, x, y) {
+    if (typeof game.tileAtWorld !== 'function' || typeof game.tileWalkable !== 'function') return false;
+    if (typeof game.canStructureOverlap !== 'function') return false;
+    if (!game.tileWalkable(game.tileAtWorld(x, y))) return false;
+    const px = peerEntry.x || 0;
+    const py = peerEntry.y || 0;
+    if (dist(px, py, x, y) > PEER_BUILD_RANGE) return false;
+
+    // 与已有建筑冲突
+    for (const structureId of getStructureIds()) {
+      const transform = getComponent(structureId, 'transform');
+      const structure = getComponent(structureId, 'structure');
+      if (!transform || !structure) continue;
+      if (!game.canStructureOverlap(kind, structure.kind) && dist(transform.x, transform.y, x, y) < 26) return false;
+    }
+    // 与活体资源节点冲突
+    for (const entityId of getResourceIds()) {
+      const transform = getComponent(entityId, 'transform');
+      const collider = getComponent(entityId, 'collider');
+      const resourceNode = getComponent(entityId, 'resourceNode');
+      if (!transform || !collider || !resourceNode?.alive) continue;
+      if (dist(transform.x, transform.y, x, y) < collider.radius + 12) return false;
+    }
+    // 不允许直接踩在 peer 本人身上
+    if (dist(px, py, x, y) < 26) return false;
+    return true;
+  }
+
+  // 退款：把刚被 client 本地扣掉的建造物加回去。client 端 addInventory 会自
+  // 动塞回合适的格子（不一定是原槽位，但物品不丢）。
+  function refundPeerBuild(peerId, itemKey, reason) {
+    if (!peerId || !itemKey) return;
+    netTransport.send(
+      NET_CHANNELS.INVENTORY,
+      netMakeInventoryUpdate({ items: { [itemKey]: 1 }, reason: reason || 'build_refund' }),
+      peerId
+    );
+  }
+
+  function handleBuildByPeer(peerId, peerEntry, data) {
+    const itemKey = typeof data.t === 'string' ? data.t : '';
+    const kind = typeof data.k === 'string' ? data.k : '';
+    const x = Number(data.x) || 0;
+    const y = Number(data.y) || 0;
+    if (!itemKey || !kind) { refundPeerBuild(peerId, itemKey, 'build_invalid'); return; }
+    // 物品必须确实是 buildable，且 buildKind 与请求 kind 一致 —— 防止用一个低价
+    // 建材请求建造高级建筑。
+    const itemConfig = typeof game.getItemConfig === 'function' ? game.getItemConfig(itemKey) : null;
+    if (!itemConfig || itemConfig.type !== 'buildable' || itemConfig.buildKind !== kind) {
+      refundPeerBuild(peerId, itemKey, 'build_invalid_item');
+      return;
+    }
+    if (!canPeerPlaceStructure(peerEntry, kind, x, y)) {
+      refundPeerBuild(peerId, itemKey, 'build_invalid_pos');
+      return;
+    }
+    if (typeof game.createStructureEntity !== 'function') {
+      refundPeerBuild(peerId, itemKey, 'build_unavailable');
+      return;
+    }
+    const entityId = game.createStructureEntity(kind, x, y);
+    if (!entityId) {
+      refundPeerBuild(peerId, itemKey, 'build_failed');
+      return;
+    }
+    if (typeof burst === 'function') burst(x, y, '#83f5ce', 8, 36);
+    // 下一拍 broadcastEntityDelta 会把这个新建筑（含 netId）推给所有 client。
+  }
+
   function handleActionReq(data, peerId) {
     if (!active || !state.running || state.over) return;
     if (!data || typeof data !== 'object' || !peerId) return;
     const peerEntry = state.players.get(peerId);
     if (!peerEntry) return;
 
-    // 简易速率限制
+    // 简易速率限制：attack 与 build 共用一个 cooldown 桶，避免同一 peer 在
+    // 一帧内同时刷 attack+build。
     const now = performance.now();
     const last = peerActionCooldown.get(peerId) || 0;
-    if (now - last < PEER_ATTACK_COOLDOWN_MS) return;
+    if (now - last < PEER_ATTACK_COOLDOWN_MS) {
+      // build 被速率限制拒绝时也要退款，否则 client 端物品消失了
+      if (data.a === 'build') {
+        refundPeerBuild(peerId, typeof data.t === 'string' ? data.t : '', 'build_throttled');
+      }
+      return;
+    }
     peerActionCooldown.set(peerId, now);
 
-    if (data.a !== 'attack') return; // MVP 仅 attack；其它动作类型留待后续
+    if (data.a === 'build') {
+      handleBuildByPeer(peerId, peerEntry, data);
+      return;
+    }
+    if (data.a !== 'attack') return; // 其它动作类型留待后续
     const target = resolveTargetByNetId(data.t);
     if (!target) return;
 

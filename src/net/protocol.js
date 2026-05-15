@@ -140,16 +140,21 @@
     };
   }
 
-  // Client -> Host：动作请求。MVP 阶段只覆盖"对目标实体的近战伤害"（采集 / 攻击）。
-  //   a   - 动作类型：'attack'（其它如 'use'/'build' 留给后续）
-  //   t   - 目标 netId（'r:chunkKey:slot' / 'e:chunkKey:slot' / 'e:d:<id>'）
-  //   tk  - 工具 key（用于 host 端计算伤害；与本地 getActiveToolKey 一致）
-  //   px/py - 客户端报告的玩家位置，host 用来做距离校验，避免越过墙打远处敌人
-  function makeActionReq({ action = 'attack', target = '', tool = '', x = 0, y = 0 } = {}) {
+  // Client -> Host：动作请求。MVP 阶段覆盖：
+  //   'attack' - 对目标实体的近战伤害（采集 / 攻击）
+  //              t = 目标 netId（'r:chunkKey:slot' / 'e:chunkKey:slot' / 'e:d:<id>'）
+  //              tk = 工具 key（用于 host 端计算伤害；与本地 getActiveToolKey 一致）
+  //              px/py - 客户端报告的玩家位置，host 用来做距离校验，避免越过墙打远处敌人
+  //   'build'  - 放置一个建筑
+  //              t = 物品 key（如 'campfire_kit'）：host 校验失败时回发 INVENTORY 退款
+  //              k = buildKind（如 'campfire' / 'wall' / 'planter' / 'collector' / 'floor'）
+  //              x/y = 期望放置的世界坐标（tile 已 snap 过）
+  function makeActionReq({ action = 'attack', target = '', tool = '', kind = '', x = 0, y = 0 } = {}) {
     return {
       a: String(action),
       t: String(target || ''),
       tk: String(tool || ''),
+      k: String(kind || ''),
       x: Math.round(x * 10) / 10,
       y: Math.round(y * 10) / 10
     };
