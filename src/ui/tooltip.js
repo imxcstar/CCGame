@@ -11,6 +11,11 @@
   }
 
   function positionFloatingElement(element, x, y, offsetX = 14, offsetY = 16) {
+    // 清除可能由移动端底部停靠布局留下的内联样式，避免 fixed 定位时 top/bottom 冲突
+    element.style.right = '';
+    element.style.bottom = '';
+    element.style.width = '';
+    element.style.maxWidth = '';
     const width = element.offsetWidth || 220;
     const height = element.offsetHeight || 120;
     const left = Math.min(window.innerWidth - width - 12, x + offsetX);
