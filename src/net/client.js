@@ -31,6 +31,7 @@
   let worldReady = false;
 
   function ensurePeerEntry(peerId, snapshotPeer) {
+    if (!peerId || typeof peerId !== 'string') return null;
     let entry = state.players.get(peerId);
     if (!entry) {
       entry = {
@@ -66,8 +67,9 @@
     const seen = new Set();
     if (Array.isArray(data.p)) {
       data.p.forEach((peer) => {
-        if (!peer || !peer.i || peer.i === selfId) return;
+        if (!peer || !peer.i || typeof peer.i !== 'string' || peer.i === selfId) return;
         const entry = ensurePeerEntry(peer.i, { name: peer.n, color: peer.c });
+        if (!entry) return;
         entry.name = peer.n || entry.name;
         entry.color = peer.c || entry.color;
         entry.x = peer.x;

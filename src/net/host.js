@@ -30,6 +30,7 @@
   let active = false;
 
   function ensurePeerEntry(peerId) {
+    if (!peerId || typeof peerId !== 'string') return null;
     let entry = state.players.get(peerId);
     if (!entry) {
       const peerInfo = game.netSession?.state?.peers?.get(peerId);
@@ -62,6 +63,7 @@
   function handleInput(data, peerId) {
     if (!active || !data || typeof data !== 'object') return;
     const entry = ensurePeerEntry(peerId);
+    if (!entry) return;
     if (typeof data.x === 'number') entry.x = data.x;
     if (typeof data.y === 'number') entry.y = data.y;
     if (typeof data.f === 'string') entry.facing = data.f;
