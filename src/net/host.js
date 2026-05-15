@@ -319,9 +319,16 @@
     return null;
   }
 
-  // 客户端 peer 的简易 attack cooldown，避免他刷网络包打超快
+  // 客户端 peer 的简易 attack cooldown，避免他刷网络包打超快。
+  // 与 action-system.js 中的本地 attackCooldown (0.26s = 260ms) 对齐：
+  // 服务端略宽容 20ms 以容忍网络抖动，既能拦截恶意客户端的高频请求，
+  // 又不会拒绝正常节奏的合法包。
   const peerActionCooldown = new Map(); // peerId -> last attack timestamp (ms)
-  const PEER_ATTACK_COOLDOWN_MS = 220;
+  const PEER_ATTACK_COOLDOWN_MS = 240;
+  // 距离校验的延迟容忍量：远端玩家的位置以 ~15Hz INPUT 上报，
+  // 在 ATTACK_RANGE + collider.radius 的基础上再放宽 PEER_RANGE_SLACK
+  // 像素，避免合法攻击因为 ghost 还没更新而被服务端拒绝。
+  const PEER_RANGE_SLACK = 24;
 
   function handleResourceAttackByPeer(peerId, target, peerEntry, toolKey) {
     const transform = getComponent(target.id, 'transform');
@@ -333,7 +340,7 @@
     const collider = getComponent(target.id, 'collider');
     const radius = collider?.radius || 0;
     const distance = dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y);
-    if (distance > ATTACK_RANGE + radius + 24) return; // +24 容忍 ghost 延迟
+    if (distance > ATTACK_RANGE + radius + PEER_RANGE_SLACK) return; // 容忍 ghost 延迟
 
     const damage = getResourceDamage(toolKey, target.id);
     health.hp -= damage;
@@ -367,7 +374,7 @@
     const collider = getComponent(target.id, 'collider');
     const radius = collider?.radius || 0;
     const distance = dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y);
-    if (distance > ATTACK_RANGE + radius + 24) return;
+    if (distance > ATTACK_RANGE + radius + PEER_RANGE_SLACK) return;
 
     const damage = getEnemyDamage(toolKey, target.id);
     health.hp -= damage;
