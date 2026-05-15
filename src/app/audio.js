@@ -197,10 +197,15 @@
   }
 
   function bindAudioUnlock() {
-    const handler = () => unlockAudio();
-    window.addEventListener('pointerdown', handler, { once: false, capture: true });
-    window.addEventListener('keydown', handler, { once: false, capture: true });
-    window.addEventListener('touchstart', handler, { once: false, capture: true, passive: true });
+    const handler = () => {
+      unlockAudio();
+      window.removeEventListener('pointerdown', handler, true);
+      window.removeEventListener('keydown', handler, true);
+      window.removeEventListener('touchstart', handler, true);
+    };
+    window.addEventListener('pointerdown', handler, { capture: true });
+    window.addEventListener('keydown', handler, { capture: true });
+    window.addEventListener('touchstart', handler, { capture: true, passive: true });
   }
 
   Object.assign(game, {
