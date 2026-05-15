@@ -114,7 +114,6 @@ body {
 }
 
 .panel {
-  position: absolute;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -124,31 +123,53 @@ body {
   border-radius: 24px;
   box-shadow: var(--shadow-card);
   color: var(--text-color-body);
-}
-
-.panel.left {
-  top: 18px;
-  left: 18px;
-  width: min(340px, calc(100vw - 36px));
   pointer-events: auto;
 }
 
-.panel.right {
+/* HUD 列容器（桌面：左/右两列；移动：解除布局） */
+.hud-col {
+  position: absolute;
   top: 18px;
-  right: 18px;
-  width: min(304px, calc(100vw - 36px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   max-height: calc(100vh - 36px);
   max-height: calc(100dvh - 36px);
   min-height: 0;
-  overflow: hidden;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
-.panel.right > div:last-child {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
+.hud-col-left {
+  left: 18px;
+  width: min(340px, calc(100vw - 36px));
+}
+
+.hud-col-right {
+  right: 18px;
+  width: min(304px, calc(100vw - 36px));
+}
+
+.panel-minimap {
+  flex: 0 0 auto;
+}
+
+.panel-status {
+  flex: 0 1 auto;
   min-height: 0;
+}
+
+.panel-inventory {
+  flex: 0 0 auto;
+}
+
+.panel-craft {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-craft .craft-list {
+  flex: 1 1 auto;
 }
 
 /* 品牌标题 */
@@ -961,10 +982,9 @@ body.touch-mode .mobile-controls {
 .panel-toggles {
   position: absolute;
   top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 14px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   pointer-events: auto;
 }
 
@@ -1001,13 +1021,13 @@ body.touch-mode .mobile-controls {
 
 /* 平板 */
 @media (max-width: 960px) {
-  .panel.left {
+  .hud-col-left {
     width: min(300px, calc(100vw - 28px));
     top: 14px;
     left: 14px;
   }
 
-  .panel.right {
+  .hud-col-right {
     width: min(280px, calc(100vw - 28px));
     top: 14px;
     right: 14px;
@@ -1019,21 +1039,29 @@ body.touch-mode .mobile-controls {
   }
 }
 
-/* 手机 / 触屏：启用移动端控件 + 折叠面板 */
+/* 手机 / 触屏：启用移动端控件 + 4 个独立面板分别折叠
+   小地图 / 背包 / 制作 由顶部按钮独立切换；状态信息（生命等）始终可见 */
 @media (max-width: 760px), (pointer: coarse) {
-  body {
-    /* 让脚本根据需要切换 touch-mode；小屏直接默认开启 */
-  }
-
   .mobile-controls {
     display: block;
   }
 
-  /* 左右面板默认隐藏，靠顶部切换按钮控制 */
-  .panel.left,
-  .panel.right {
+  /* 列容器在移动端不再作为绝对定位的承载，
+     由各面板分别相对视口定位 */
+  .hud-col {
+    position: static;
+    display: contents;
+  }
+
+  /* 三个可切换面板：默认隐藏，由 .show-mobile 显示 */
+  .panel-minimap,
+  .panel-inventory,
+  .panel-craft {
+    position: absolute;
     width: min(360px, calc(100vw - 24px));
-    max-height: calc(100dvh - 220px);
+    /* 顶部 72px 给切换按钮与状态 HUD；
+       底部约 168px 给摇杆 / 动作按钮 */
+    max-height: calc(100dvh - 240px);
     top: 72px;
     left: 12px;
     right: 12px;
@@ -1044,26 +1072,92 @@ body.touch-mode .mobile-controls {
     overflow-y: auto;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
+    z-index: 10;
   }
 
-  .panel.left.show-mobile,
-  .panel.right.show-mobile {
+  .panel-minimap {
+    right: auto;
+  }
+
+  .panel-inventory,
+  .panel-craft {
+    left: auto;
+  }
+
+  .panel-minimap.show-mobile,
+  .panel-inventory.show-mobile,
+  .panel-craft.show-mobile {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
   }
 
-  .panel.left {
-    right: auto;
+  /* 始终可见的紧凑状态 HUD（生命/饥饿/口渴/体力）
+     2×2 网格、半透明、不拦截触摸，避免遮挡场景；
+     置于顶部右侧，与左侧切换按钮分置避免重叠 */
+  .panel-status {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    left: auto;
+    /* 100vw - 200px：左侧约 14+160px 留给切换按钮与间距，避免重叠 */
+    width: min(360px, calc(100vw - 200px));
+    max-height: none;
+    padding: 8px 12px;
+    border-radius: 18px;
+    background: rgba(247, 243, 223, 0.86);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    pointer-events: none;
+    opacity: 1;
+    z-index: 8;
   }
 
-  .panel.right {
-    left: auto;
+  .panel-status .status-card {
+    padding: 0;
+    gap: 6px;
+    background: transparent;
+    border: none;
+  }
+
+  /* 状态 HUD 内：隐藏非必要文本，只保留 4 条紧凑生命条 */
+  .panel-status .status-row,
+  .panel-status .message,
+  .panel-status .hint,
+  .panel-status .controls,
+  .panel-status .brand {
+    display: none;
+  }
+
+  .panel-status .bars {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+  }
+
+  .panel-status .bar {
+    grid-template-columns: 28px 1fr 28px;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .panel-status .bar-track {
+    height: 8px;
+    border-width: 1.5px;
+  }
+
+  /* 小地图卡片里的品牌（标题 + 日期）：移动端显示在小地图面板内 */
+  .panel-minimap .minimap-brand {
+    font-size: 13px;
+  }
+
+  .panel-minimap .minimap-brand strong {
+    font-size: 18px;
   }
 
   .world-target-panel {
     bottom: auto;
-    top: 72px;
+    top: 88px;
     left: 50%;
     width: min(420px, calc(100vw - 24px));
   }
@@ -1084,6 +1178,41 @@ body.touch-mode .mobile-controls {
 
 /* 超小屏 */
 @media (max-width: 420px) {
+  /* 切换按钮缩小，让出更多空间给状态 HUD */
+  .panel-toggle {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+  }
+
+  .panel-toggles {
+    gap: 6px;
+    top: 10px;
+    left: 10px;
+  }
+
+  /* 状态 HUD：放到切换按钮下方一行，避免横向太挤 */
+  .panel-status {
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+
+  /* 可切换面板的起始高度也下移，避免与状态 HUD 重叠 */
+  .panel-minimap,
+  .panel-inventory,
+  .panel-craft {
+    top: 142px;
+    /* 顶部 142px（切换按钮 + 状态 HUD）+ 底部约 168px 控件区域 */
+    max-height: calc(100dvh - 310px);
+  }
+
+  .world-target-panel {
+    top: 142px;
+  }
+
   .joystick {
     width: 120px;
     height: 120px;
