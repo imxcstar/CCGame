@@ -54,12 +54,50 @@
     };
   }
 
+  // Client -> Host：每个 tick 发一帧"我的玩家当前状态"。MVP 阶段 Host 不做
+  // 物理对账，仅把客户端汇报的位置作为远端 ghost 显示给其他玩家。后续接入
+  // 输入预测 / 服务器对账时，只需在保留字段 mv / aim 上追加按键状态。
+  function makeInput({ seq, x, y, facing, isMoving, animationTime, hp }) {
+    return {
+      q: seq | 0,
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      f: facing || 'down',
+      m: isMoving ? 1 : 0,
+      a: Math.round((animationTime || 0) * 100) / 100,
+      h: typeof hp === 'number' ? Math.round(hp) : -1
+    };
+  }
+
+  // Host -> Client：定时世界快照。MVP 只携带玩家位置 + 全局 day/time，
+  // 其他实体（敌人、资源、建筑）仍由各端使用相同种子各自模拟。
+  function makeSnapshot({ tick, day, time, players }) {
+    return {
+      k: tick | 0,
+      d: typeof day === 'number' ? day : 1,
+      t: typeof time === 'number' ? time : 0,
+      p: (players || []).map((peer) => ({
+        i: peer.id,
+        n: peer.name || '',
+        c: peer.color || '',
+        x: Math.round(peer.x * 10) / 10,
+        y: Math.round(peer.y * 10) / 10,
+        f: peer.facing || 'down',
+        m: peer.isMoving ? 1 : 0,
+        a: Math.round((peer.animationTime || 0) * 100) / 100,
+        h: typeof peer.hp === 'number' ? Math.round(peer.hp) : -1
+      }))
+    };
+  }
+
   Object.assign(game, {
     NET_PROTOCOL_VERSION: PROTOCOL_VERSION,
     NET_CHANNELS: CHANNELS,
     NET_ROLES: ROLES,
     netMakeHello: makeHello,
     netMakePeerInfo: makePeerInfo,
-    netMakeChat: makeChat
+    netMakeChat: makeChat,
+    netMakeInput: makeInput,
+    netMakeSnapshot: makeSnapshot
   });
 })(window.TidalIsle);

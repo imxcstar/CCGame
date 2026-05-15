@@ -61,6 +61,8 @@ import './ui/panels.js';
 import './ui/interactions.js';
 import './net/protocol.js';
 import './net/transport.js';
+import './net/host.js';
+import './net/client.js';
 import './net/session.js';
 import './ui/multiplayer.js';
 import './ui.js';

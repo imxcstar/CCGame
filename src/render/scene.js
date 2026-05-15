@@ -15,6 +15,7 @@
     drawStructure,
     drawEnemy,
     drawPlayer,
+    drawRemotePlayer,
     drawFishingCast,
     drawSelectedWorldTargetHighlight,
     drawParticles,
@@ -61,6 +62,16 @@
 
     const playerTransform = getComponent(state.playerId, 'transform');
     if (playerTransform) drawables.push({ y: playerTransform.y, type: 'player', id: state.playerId });
+
+    // 远端玩家 ghost：与本地玩家一起参与 y 排序，确保前后遮挡正确
+    if (state.players && state.players.size) {
+      state.players.forEach((peer) => {
+        if (peer.isLocal) return;
+        if (typeof peer.y !== 'number') return;
+        drawables.push({ y: peer.y, type: 'remotePlayer', id: peer.id, peer });
+      });
+    }
+
     drawables.sort((first, second) => first.y - second.y);
 
     const selectedTarget = getSelectedWorldTarget?.();
@@ -76,6 +87,7 @@
       if (drawable.type === 'entity') drawEntity(drawable.id, shakeX, shakeY);
       if (drawable.type === 'enemy') drawEnemy(drawable.id, shakeX, shakeY);
       if (drawable.type === 'player') drawPlayer(shakeX, shakeY);
+      if (drawable.type === 'remotePlayer') drawRemotePlayer(drawable.peer, shakeX, shakeY);
     }
 
     drawFishingCast(shakeX, shakeY);

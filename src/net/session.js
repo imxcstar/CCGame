@@ -237,6 +237,8 @@
       await netTransport.join(code);
       registerLocalPeer();
       setStatus('connected');
+      // 启动 host 同步循环（broadcast SNAPSHOT、接收 INPUT）
+      game.netHostStart?.();
       pushChat({ system: true, text: `房间已创建：${code}（分享给好友以加入）`, ts: Date.now() });
       return code;
     } catch (err) {
@@ -263,6 +265,8 @@
       await netTransport.join(sanitized);
       registerLocalPeer();
       setStatus('connected');
+      // 启动 client：等 HELLO 中的 seed 到达后 bootstrap 世界
+      game.netClientStart?.();
       pushChat({ system: true, text: `已加入房间：${sanitized}`, ts: Date.now() });
       return sanitized;
     } catch (err) {
@@ -273,6 +277,9 @@
 
   async function leave() {
     if (session.status === 'idle') return;
+    // 先停掉 host/client 同步，再断开 transport，避免在 leave 过程中还在广播
+    game.netHostStop?.();
+    game.netClientStop?.();
     await netTransport.leave();
     pushChat({ system: true, text: '你已离开房间', ts: Date.now() });
     resetState();
