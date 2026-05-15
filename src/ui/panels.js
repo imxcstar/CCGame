@@ -108,12 +108,17 @@
       const markup = `
         <div class="craft-row">
           <span class="craft-icon" aria-hidden="true">${item.icon}</span>
-          <div>
-            <strong>${recipe.name}</strong>
-            <div class="subtle">${getItemTypeLabel(item)} · 持有 ${craftedCount}</div>
+          <div class="craft-info">
+            <div class="craft-info-top">
+              <strong>${recipe.name}</strong>
+              <span class="subtle craft-have">持有 ${craftedCount}</span>
+            </div>
+            <div class="subtle craft-info-bottom">
+              <span class="craft-type">${getItemTypeLabel(item)}</span>
+              <span class="craft-cost">${formatCost(recipe.cost)}</span>
+            </div>
           </div>
         </div>
-        <span class="subtle">${formatCost(recipe.cost)}</span>
       `;
 
       button.classList.toggle('active', selected.key === key && !selected.isFallback);

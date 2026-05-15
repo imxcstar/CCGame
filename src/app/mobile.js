@@ -222,23 +222,20 @@
   }
 
   // ----------------------------------------------------------------
-  // 背包格触屏长按 = 打开物品菜单（替代右键）
+  // 背包格触屏点击 = 选中物品并打开介绍 + 操作菜单（无需长按）
   // ----------------------------------------------------------------
-  function bindInventoryLongPress() {
+  function bindInventoryTouchMenu() {
     const surface = dom.inventoryEl;
     if (!surface) return;
 
-    let timer = null;
     let target = null;
     let startX = 0;
     let startY = 0;
+    let cancelled = false;
 
-    function clear() {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
+    function reset() {
       target = null;
+      cancelled = false;
     }
 
     surface.addEventListener('pointerdown', (event) => {
@@ -248,32 +245,47 @@
       target = slot;
       startX = event.clientX;
       startY = event.clientY;
-      timer = setTimeout(() => {
-        if (!target) return;
-        const source = target.dataset.slotSource;
-        const index = Number(target.dataset.slotIndex);
-        game.openItemMenu?.(source, index, startX, startY);
-        timer = null;
-        target = null;
-      }, 420);
+      cancelled = false;
     });
 
     surface.addEventListener('pointermove', (event) => {
       if (!target) return;
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) {
-        clear();
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 12) {
+        cancelled = true;
       }
     });
 
-    surface.addEventListener('pointerup', clear);
-    surface.addEventListener('pointercancel', clear);
+    surface.addEventListener('pointerup', (event) => {
+      if (event.pointerType === 'mouse') return;
+      if (!target || cancelled) {
+        reset();
+        return;
+      }
+      const source = target.dataset.slotSource;
+      const index = Number(target.dataset.slotIndex);
+      const rect = target.getBoundingClientRect();
+      // 菜单显示在格子下方，介绍显示在格子上方，避免互相遮挡
+      const menuX = rect.left;
+      const menuY = rect.bottom + 4;
+      const tipX = rect.left;
+      const tipY = Math.max(12, rect.top - 180);
+
+      game.openItemMenu?.(source, index, menuX, menuY);
+      const reference = game.getDisplayReference?.(source, index);
+      if (reference) {
+        game.renderTooltip?.(reference, source, index, tipX, tipY);
+      }
+      reset();
+    });
+
+    surface.addEventListener('pointercancel', reset);
   }
 
   function bindMobileControls() {
     bindJoystick();
     bindActionButtons();
     bindPanelToggles();
-    bindInventoryLongPress();
+    bindInventoryTouchMenu();
   }
 
   Object.assign(game, {

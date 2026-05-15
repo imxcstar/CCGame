@@ -42,6 +42,16 @@
     if (player.player.isMoving) {
       const actualSpeed = movementDistance / Math.max(dt, 0.001);
       player.player.animationTime += dt * actualSpeed * 0.09;
+
+      // 行走脚步音：按距离推进而非按时间，使冲刺更密集，慢走更稀疏
+      const stepStride = (activeKeys.ShiftLeft || activeKeys.ShiftRight) ? 36 : 48;
+      player.player.stepDistance = (player.player.stepDistance || 0) + movementDistance;
+      if (player.player.stepDistance >= stepStride) {
+        player.player.stepDistance = 0;
+        game.playSound?.('footstep');
+      }
+    } else {
+      player.player.stepDistance = 0;
     }
 
     player.survival.hunger = Math.max(0, player.survival.hunger - dt * 0.22);

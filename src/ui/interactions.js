@@ -73,6 +73,7 @@
       if (dom.itemMenuEl.contains(event.target)) return;
       if (event.button === 2) return;
       closeItemMenu();
+      closeTooltip();
     });
 
     window.addEventListener('blur', () => {

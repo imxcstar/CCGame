@@ -124,6 +124,16 @@
       playNoise({ duration: 0.09, gain: 0.32, filter: 1200, release: 0.1 });
       playTone({ type: 'triangle', freq: 360, freq2: 240, duration: 0.1, gain: 0.18, release: 0.08 });
     },
+    chop() {
+      // 采集中的击打音：短促木质 / 石质敲击感
+      playNoise({ duration: 0.05, gain: 0.26, filter: 1500, release: 0.05 });
+      playTone({ type: 'triangle', freq: 480, freq2: 320, duration: 0.05, gain: 0.16, release: 0.05 });
+    },
+    footstep() {
+      // 轻量脚步音：低频闷响 + 极短噪声
+      playNoise({ duration: 0.03, gain: 0.12, filter: 600, release: 0.04 });
+      playTone({ type: 'sine', freq: 160, freq2: 110, duration: 0.04, gain: 0.08, release: 0.04 });
+    },
     hit() {
       playNoise({ duration: 0.06, gain: 0.36, filter: 2400, release: 0.06 });
       playTone({ type: 'square', freq: 220, freq2: 140, duration: 0.06, gain: 0.18, release: 0.05 });
