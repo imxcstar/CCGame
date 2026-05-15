@@ -3,6 +3,7 @@
     game.createCraftButtons();
     game.bindInventoryUi();
     game.bindOverlayButtons();
+    game.bindMobileControls?.();
   }
 
   Object.assign(game, {

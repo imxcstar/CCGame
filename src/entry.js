@@ -65,6 +65,7 @@ import './render/drawables.js';
 import './render/scene.js';
 import './render.js';
 import './app/input.js';
+import './app/mobile.js';
 import './app/loop.js';
 import './app/bootstrap.js';
 import './main.js';
