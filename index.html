@@ -2,8 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#19c8b9">
   <title>潮汐孤岛</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
@@ -30,7 +36,7 @@
         </div>
         <div class="message" id="message"></div>
         <div class="hint" id="hint"></div>
-        <div class="controls">WASD 移动 · Shift 冲刺 · 左键行动/使用 · E 交互 · 背包左键切换手持 · 背包右键菜单</div>
+        <div class="controls">桌面：WASD 移动 · Shift 冲刺 · 左键行动 · E 交互 · 右键背包菜单<br>移动端：左侧摇杆移动 · 红钮攻击/使用 · 青钮交互 · 黄钮冲刺 · 点击地图瞄准</div>
       </div>
     </div>
 
@@ -80,6 +86,23 @@
       <div class="overlay-actions">
         <button class="primary" id="restartBtn">重新开始</button>
       </div>
+    </div>
+  </div>
+
+  <div class="mobile-controls" id="mobileControls" aria-hidden="true">
+    <div class="panel-toggles">
+      <button type="button" class="panel-toggle" id="togglePanelLeft" aria-label="状态">🧭</button>
+      <button type="button" class="panel-toggle" id="togglePanelRight" aria-label="背包">🎒</button>
+    </div>
+
+    <div class="joystick" id="joystick">
+      <div class="joystick-stick" id="joystickStick"></div>
+    </div>
+
+    <div class="action-buttons">
+      <button type="button" class="action-btn sprint" id="btnSprint" aria-label="冲刺">冲刺</button>
+      <button type="button" class="action-btn interact" id="btnInteract" aria-label="交互">交互</button>
+      <button type="button" class="action-btn attack" id="btnAttack" aria-label="攻击">攻击</button>
     </div>
   </div>
 
