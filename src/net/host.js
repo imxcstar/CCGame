@@ -777,7 +777,9 @@
           // tk 是 JSON 序列化的 cost 对象，client 在请求时塞进去
           const cost = JSON.parse(data.tk);
           if (cost && typeof cost === 'object') refundPeerItems(peerId, cost, 'repair_throttled');
-        } catch { /* ignore */ }
+        } catch (err) {
+          console.warn('[net/host] repair cost parse error', err);
+        }
       }
       return;
     }
@@ -814,7 +816,12 @@
         else if (data.a === 'refuel') refundPeerItems(peerId, { wood: 1 }, 'refuel_no_target');
         else if (data.a === 'cook' && data.tk) refundPeerItems(peerId, { [data.tk]: 1 }, 'cook_no_target');
         else if (data.a === 'repair' && data.tk) {
-          try { const cost = JSON.parse(data.tk); if (cost) refundPeerItems(peerId, cost, 'repair_no_target'); } catch { /* ignore */ }
+          try {
+            const cost = JSON.parse(data.tk);
+            if (cost) refundPeerItems(peerId, cost, 'repair_no_target');
+          } catch (err) {
+            console.warn('[net/host] repair cost parse error', err);
+          }
         }
         return;
       }

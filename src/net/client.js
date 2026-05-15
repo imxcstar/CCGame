@@ -133,10 +133,10 @@
       if (inputHistory[i].seq === ack) { matchIdx = i; break; }
       if (inputHistory[i].seq > ack) break;
     }
-    // 裁掉所有 <= ack 的项
-    while (inputHistory.length > 0 && inputHistory[0].seq <= ack) {
-      inputHistory.shift();
-    }
+    // 裁掉所有 <= ack 的项（一次性 splice 比循环 shift 更高效）
+    let dropCount = 0;
+    while (dropCount < inputHistory.length && inputHistory[dropCount].seq <= ack) dropCount += 1;
+    if (dropCount > 0) inputHistory.splice(0, dropCount);
     if (matchIdx < 0) return;
     // 比对历史位置与 host 报告位置
     const transform = getComponent(state.playerId, 'transform');
