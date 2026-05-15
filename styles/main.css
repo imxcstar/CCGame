@@ -1059,6 +1059,8 @@ body.touch-mode .mobile-controls {
   .panel-craft {
     position: absolute;
     width: min(360px, calc(100vw - 24px));
+    /* 顶部 72px 给切换按钮与状态 HUD；
+       底部约 168px 给摇杆 / 动作按钮 */
     max-height: calc(100dvh - 240px);
     top: 72px;
     left: 12px;
@@ -1098,6 +1100,7 @@ body.touch-mode .mobile-controls {
     top: 14px;
     right: 14px;
     left: auto;
+    /* 100vw - 200px：左侧约 14+160px 留给切换按钮与间距，避免重叠 */
     width: min(360px, calc(100vw - 200px));
     max-height: none;
     padding: 8px 12px;
@@ -1202,6 +1205,7 @@ body.touch-mode .mobile-controls {
   .panel-inventory,
   .panel-craft {
     top: 142px;
+    /* 顶部 142px（切换按钮 + 状态 HUD）+ 底部约 168px 控件区域 */
     max-height: calc(100dvh - 310px);
   }
 
