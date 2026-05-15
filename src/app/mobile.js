@@ -223,7 +223,36 @@
 
   // ----------------------------------------------------------------
   // 背包格触屏点击 = 选中物品并打开介绍 + 操作菜单（无需长按）
+  // 移动端：将操作菜单与介绍组合成底部停靠面板，避免相互遮挡
   // ----------------------------------------------------------------
+  function dockTooltipAndMenuAtBottom() {
+    const tipEl = dom.itemTooltipEl;
+    const menuEl = dom.itemMenuEl;
+    if (!tipEl || !menuEl) return;
+
+    const sideMargin = 12;
+    const bottomMargin = 12;
+    const gap = 8;
+
+    const menuVisible = menuEl.classList.contains('show');
+
+    // 统一宽度并贴左右边缘，保证可读区域最大化
+    [tipEl, menuEl].forEach((el) => {
+      el.style.left = sideMargin + 'px';
+      el.style.right = sideMargin + 'px';
+      el.style.width = 'auto';
+      el.style.maxWidth = 'none';
+      el.style.top = 'auto';
+    });
+
+    menuEl.style.bottom = bottomMargin + 'px';
+
+    // 介绍贴在菜单上方；若菜单未显示（如默认拳头），介绍直接贴底
+    const menuHeight = menuVisible ? menuEl.offsetHeight : 0;
+    const tipBottom = bottomMargin + (menuVisible ? menuHeight + gap : 0);
+    tipEl.style.bottom = tipBottom + 'px';
+  }
+
   function bindInventoryTouchMenu() {
     const surface = dom.inventoryEl;
     if (!surface) return;
@@ -263,18 +292,17 @@
       }
       const source = target.dataset.slotSource;
       const index = Number(target.dataset.slotIndex);
-      const rect = target.getBoundingClientRect();
-      // 菜单显示在格子下方，介绍显示在格子上方，避免互相遮挡
-      const menuX = rect.left;
-      const menuY = rect.bottom + 4;
-      const tipX = rect.left;
-      const tipY = Math.max(12, rect.top - 180);
 
-      game.openItemMenu?.(source, index, menuX, menuY);
+      // 先按桌面坐标打开（内部会做边界钳制），随后改用底部停靠布局覆盖位置
+      const rect = target.getBoundingClientRect();
+      game.openItemMenu?.(source, index, rect.left, rect.bottom);
       const reference = game.getDisplayReference?.(source, index);
       if (reference) {
-        game.renderTooltip?.(reference, source, index, tipX, tipY);
+        game.renderTooltip?.(reference, source, index, rect.left, rect.top);
       }
+      // 等待菜单/介绍渲染后取真实高度，再统一停靠到底部
+      dockTooltipAndMenuAtBottom();
+
       reset();
     });
 
