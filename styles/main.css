@@ -116,11 +116,11 @@ body {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
   background: var(--bg-color-content);
   border: 2px solid var(--border-color-light);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--shadow-card);
   color: var(--text-color-body);
   pointer-events: auto;
@@ -129,24 +129,24 @@ body {
 /* HUD 列容器（桌面：左/右两列；移动：解除布局） */
 .hud-col {
   position: absolute;
-  top: 18px;
+  top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-height: calc(100vh - 36px);
-  max-height: calc(100dvh - 36px);
+  gap: 10px;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
   min-height: 0;
   pointer-events: none;
 }
 
 .hud-col-left {
-  left: 18px;
-  width: min(340px, calc(100vw - 36px));
+  left: 12px;
+  width: min(264px, calc(100vw - 24px));
 }
 
 .hud-col-right {
-  right: 18px;
-  width: min(304px, calc(100vw - 36px));
+  right: 12px;
+  width: min(244px, calc(100vw - 24px));
 }
 
 .panel-minimap {
@@ -181,7 +181,7 @@ body {
 }
 
 .brand strong {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.04em;
   color: var(--text-color);
@@ -213,17 +213,17 @@ body {
 
 .bar {
   display: grid;
-  grid-template-columns: 56px 1fr auto;
-  gap: 10px;
+  grid-template-columns: 44px 1fr auto;
+  gap: 8px;
   align-items: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-color-body);
 }
 
 .bar-track {
   position: relative;
-  height: 12px;
+  height: 10px;
   border-radius: 999px;
   overflow: hidden;
   background: var(--bg-color-secondary);
@@ -257,9 +257,9 @@ body {
 /* 区块标题 */
 .section-title {
   display: inline-block;
-  margin-bottom: 10px;
-  padding: 4px 12px;
-  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-color);
@@ -275,7 +275,7 @@ body {
 .inventory {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .inventory-meta {
@@ -358,7 +358,7 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
   filter: drop-shadow(0 2px 3px rgba(107, 92, 67, 0.25));
 }
@@ -408,12 +408,12 @@ body {
 .craft-icon {
   display: inline-grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   background: var(--primary-color-bg);
   border: 2px solid #b9ebe5;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1;
   flex: 0 0 auto;
 }
@@ -435,15 +435,16 @@ button {
   border: 2px solid var(--bg-color);
   background: var(--bg-color);
   color: var(--text-color);
-  border-radius: 18px;
-  padding: 10px 16px;
+  border-radius: 16px;
+  padding: 8px 12px;
   font: inherit;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-align: left;
   line-height: 1.2;
   cursor: pointer;
-  box-shadow: 0 5px 0 0 var(--shadow-btn);
+  box-shadow: 0 4px 0 0 var(--shadow-btn);
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     background 0.25s cubic-bezier(0.4, 0, 0.2, 1),
@@ -634,6 +635,29 @@ button.primary:active {
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-color-secondary);
+}
+
+/* 默认按桌面显示「桌面端」操作；触屏 / 移动端切换为「移动端」操作 */
+.controls-desktop,
+.controls-mobile {
+  display: block;
+}
+
+.controls-mobile {
+  display: none;
+}
+
+body.touch-mode .controls-desktop {
+  display: none;
+}
+
+body.touch-mode .controls-mobile {
+  display: block;
+}
+
+/* 桌面端通过快捷键 / API 隐藏面板时使用此类 */
+.panel.panel-hidden {
+  display: none;
 }
 
 /* ============================================================

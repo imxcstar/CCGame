@@ -163,36 +163,60 @@
   }
 
   // ----------------------------------------------------------------
-  // 面板切换：手机上隐藏可切换面板（小地图 / 背包 / 制作），
-  // 状态 HUD 始终可见。点同一按钮可再次关闭；任一时刻最多打开一个
+  // 面板切换：桌面端通过快捷键切换显示/隐藏（添加 .panel-hidden）；
+  // 移动端通过顶部按钮切换显示（添加 .show-mobile，同一时间最多一个）
   // ----------------------------------------------------------------
-  function bindPanelToggles() {
-    const toggles = [
-      { btnId: 'togglePanelMinimap', panelId: 'minimapPanel' },
-      { btnId: 'togglePanelInventory', panelId: 'inventoryPanel' },
-      { btnId: 'togglePanelCraft', panelId: 'craftPanel' }
-    ];
+  const PANEL_TOGGLES = [
+    { btnId: 'togglePanelMinimap', panelId: 'minimapPanel' },
+    { btnId: 'togglePanelInventory', panelId: 'inventoryPanel' },
+    { btnId: 'togglePanelCraft', panelId: 'craftPanel' }
+  ];
 
-    const entries = toggles
+  function isTouchMode() {
+    return document.body.classList.contains('touch-mode');
+  }
+
+  function getToggleEntries() {
+    return PANEL_TOGGLES
       .map(({ btnId, panelId }) => ({
         btn: document.getElementById(btnId),
         panel: document.getElementById(panelId)
       }))
-      .filter((entry) => entry.btn && entry.panel);
+      .filter((entry) => entry.panel);
+  }
 
-    function setVisible(entry, visible) {
-      entry.panel.classList.toggle('show-mobile', visible);
-      entry.btn.classList.toggle('active', visible);
+  function setMobileVisible(entry, visible) {
+    if (!entry.panel) return;
+    entry.panel.classList.toggle('show-mobile', visible);
+    entry.btn?.classList.toggle('active', visible);
+  }
+
+  // 公开的统一面板切换：根据当前是否为触屏决定行为
+  function togglePanel(panelId) {
+    const entries = getToggleEntries();
+    const entry = entries.find((item) => item.panel?.id === panelId);
+    if (!entry) return;
+
+    if (isTouchMode()) {
+      const willOpen = !entry.panel.classList.contains('show-mobile');
+      entries.forEach((other) => {
+        if (other !== entry) setMobileVisible(other, false);
+      });
+      setMobileVisible(entry, willOpen);
+    } else {
+      const willHide = !entry.panel.classList.contains('panel-hidden');
+      entry.panel.classList.toggle('panel-hidden', willHide);
+      entry.btn?.classList.toggle('active', !willHide);
     }
+    game.playSound?.('panel');
+  }
 
+  function bindPanelToggles() {
+    const entries = getToggleEntries();
     entries.forEach((entry) => {
+      if (!entry.btn) return;
       entry.btn.addEventListener('click', () => {
-        const willOpen = !entry.panel.classList.contains('show-mobile');
-        // 关闭其他面板，确保同一时刻只有一个面板可见
-        entries.forEach((other) => {
-          if (other !== entry) setVisible(other, false);
-        });
-        setVisible(entry, willOpen);
+        togglePanel(entry.panel.id);
       });
     });
   }
@@ -253,7 +277,8 @@
   }
 
   Object.assign(game, {
-    bindMobileControls
+    bindMobileControls,
+    togglePanel
   });
 
   // 兼容游戏内 state 未使用的引用，避免被打包工具警告

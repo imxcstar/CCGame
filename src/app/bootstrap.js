@@ -5,6 +5,7 @@
     resize();
     state.pointer.x = view.width * 0.5;
     state.pointer.y = view.height * 0.5;
+    game.bindAudioUnlock?.();
     game.initUi?.();
     game.newGame?.();
     game.updateUI?.();

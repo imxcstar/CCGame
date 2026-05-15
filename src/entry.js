@@ -64,6 +64,7 @@ import './render/effects.js';
 import './render/drawables.js';
 import './render/scene.js';
 import './render.js';
+import './app/audio.js';
 import './app/input.js';
 import './app/mobile.js';
 import './app/loop.js';

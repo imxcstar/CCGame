@@ -23,7 +23,7 @@
             <span class="section-title">海图</span>
             <span class="subtle" id="minimapInfo">群岛 0</span>
           </div>
-          <canvas id="minimap" class="minimap-canvas" width="208" height="208"></canvas>
+          <canvas id="minimap" class="minimap-canvas" width="160" height="160"></canvas></canvas>
           <div class="brand minimap-brand">
             <strong>潮汐孤岛</strong>
             <span id="dayInfo">第 1 天 · 清晨</span>
@@ -40,7 +40,16 @@
           </div>
           <div class="message" id="message"></div>
           <div class="hint" id="hint"></div>
-          <div class="controls">桌面：WASD 移动 · Shift 冲刺 · 左键行动 · E 交互 · 右键背包菜单<br>移动端：左侧摇杆移动 · 红钮攻击/使用 · 青钮交互 · 黄钮冲刺 · 点击地图瞄准</div>
+          <div class="controls">
+            <span class="controls-desktop">
+              WASD 移动 · Shift 冲刺 · 左键行动 · 右键取消手持 · E 交互<br>
+              M 海图 · B 背包 · C 制作 · Esc 关闭菜单
+            </span>
+            <span class="controls-mobile">
+              左侧摇杆移动 · 红钮攻击 / 使用 · 青钮交互 · 黄钮冲刺<br>
+              点击地图瞄准 · 顶部按钮切换海图 / 背包 / 制作 · 长按背包格打开菜单
+            </span>
+          </div>
         </div>
       </div>
     </div>

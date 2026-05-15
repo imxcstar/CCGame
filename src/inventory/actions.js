@@ -42,6 +42,7 @@
 
     spendCost(recipe.cost);
     addInventory({ [key]: 1 });
+    game.playSound?.('craft');
     showMessage('已制作 ' + getItemConfig(key).name);
     return true;
   }
@@ -69,6 +70,7 @@
     }
 
     applyConsumableEffect(player, reference.key);
+    game.playSound?.('eat');
     setScore();
     return true;
   }
@@ -93,12 +95,14 @@
 
     if (state.selectedInventoryIndex === reference.inventoryIndex) {
       setSelectedInventoryIndex(null);
+      game.playSound?.('select');
       showMessage('切换为空手');
       return true;
     }
 
     clearSelectedWorldTarget?.();
     setSelectedInventoryIndex(reference.inventoryIndex);
+    game.playSound?.('select');
     showMessage('当前手持 ' + getItemConfig(reference.key).name);
     return true;
   }
@@ -134,6 +138,7 @@
       setSelectedInventoryIndex(null);
     }
 
+    game.playSound?.('drop');
     showMessage('丢弃 1 个 ' + getItemConfig(reference.key).name);
     setScore();
     return true;
