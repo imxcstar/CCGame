@@ -2,8 +2,11 @@
  * Trystero 传输层封装（第 1 步基建）
  *
  * 不自建后端：使用 Trystero 的 torrent strategy（公共 BitTorrent tracker
- * 作为 WebRTC 信令通道）。如未来需要切换 strategy（nostr / mqtt），只需替换
- * 动态 import 的子路径。
+ * 作为 WebRTC 信令通道）。在 Trystero v0.24 起，torrent strategy 已从主包
+ * `trystero/torrent` 拆出到独立子包 `@trystero-p2p/torrent`，原路径会抛
+ * "Importing from \"trystero/torrent\" is deprecated" 的错误，因此这里直接
+ * 动态 import 新包。如未来需要切换 strategy（nostr / mqtt），只需替换
+ * 动态 import 的包名（`@trystero-p2p/nostr`、`@trystero-p2p/mqtt` 等）。
  *
  * 对外暴露的 transport 对象：
  *   - join(roomId, opts): 进入房间，返回 Promise<{ selfId }>
@@ -43,7 +46,9 @@
   async function ensureTrystero() {
     if (trysteroJoinRoom) return trysteroJoinRoom;
     // 动态 import 让单机模式不加载 Trystero / 其依赖
-    const mod = await import('trystero/torrent');
+    // 注意：torrent strategy 在 trystero v0.24 起已迁移到 @trystero-p2p/torrent，
+    // 旧路径 'trystero/torrent' 会在运行时抛弃用错误。
+    const mod = await import('@trystero-p2p/torrent');
     trysteroJoinRoom = mod.joinRoom;
     return trysteroJoinRoom;
   }

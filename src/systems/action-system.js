@@ -844,6 +844,17 @@
     if (player.player.attackCooldown > 0) return false;
 
     player.player.attackCooldown = 0.26;
+
+    // 联机 client 模式：不直接改世界，把"近战命中"作为 ACTION_REQ 发给 host。
+    // host 端会执行真正的伤害结算与战利品分发，结果通过 ENTITY_DELTA /
+    // INVENTORY 回流到本地。这里仍然保留本地的攻击 cooldown 与起手 burst，
+    // 保证手感与单机一致。
+    if (state.netMode === 'client' && typeof game.netClientRequestAttack === 'function') {
+      burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
+      game.netClientRequestAttack();
+      return true;
+    }
+
     const target = getAttackTarget();
     burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
 

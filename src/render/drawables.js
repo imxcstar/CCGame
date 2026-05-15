@@ -301,12 +301,71 @@
     drawStructureGhost(preview.kind, screen, preview.valid);
   }
 
+  function drawRemotePlayer(peer, shakeX, shakeY) {
+    if (!peer || typeof peer.x !== 'number' || typeof peer.y !== 'number') return;
+    const screen = worldToScreen(peer.x, peer.y, shakeX, shakeY);
+    if (screen.x < -120 || screen.y < -160 || screen.x > view.width + 120 || screen.y > view.height + 120) return;
+
+    const walkPhase = peer.animationTime || 0;
+    const legSwing = peer.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
+    const armSwing = peer.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
+    const bounce = peer.isMoving ? Math.abs(Math.sin(walkPhase)) * 1.4 : 0;
+    const facing = peer.facing || 'down';
+
+    ctx.save();
+    ctx.translate(screen.x, screen.y);
+
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, 12, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (facing === 'up') {
+      drawPlayerBackFrame(bounce, legSwing, armSwing);
+    } else if (facing === 'left' || facing === 'right') {
+      drawPlayerSideFrame(facing, bounce, legSwing, armSwing);
+    } else {
+      drawPlayerFrontFrame(bounce, legSwing, armSwing);
+    }
+
+    // 玩家颜色描边（区分远端玩家）
+    if (peer.color) {
+      ctx.strokeStyle = peer.color;
+      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.ellipse(0, -3 - bounce, 11, 14, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // 昵称气泡
+    if (peer.name) {
+      ctx.font = '11px "Microsoft YaHei", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const labelWidth = ctx.measureText(peer.name).width + 10;
+      const labelX = -labelWidth / 2;
+      const labelY = -28 - bounce;
+      ctx.fillStyle = 'rgba(8, 20, 30, 0.72)';
+      ctx.fillRect(labelX, labelY - 8, labelWidth, 14);
+      ctx.fillStyle = peer.color || '#e6f6ff';
+      ctx.fillRect(labelX, labelY - 8, 3, 14);
+      ctx.fillStyle = '#f1f7ff';
+      ctx.fillText(peer.name, 0, labelY - 1);
+    }
+
+    ctx.restore();
+  }
+
   Object.assign(game, {
     drawTile,
     drawEntity,
     drawStructure,
     drawEnemy,
     drawPlayer,
+    drawRemotePlayer,
     drawFishingCast,
     drawSelectedWorldTargetHighlight,
     drawParticles,
