@@ -42,6 +42,7 @@
   // 由 client 在第一次看到时本地创建。
   const remoteResourceMap = new Map();   // netId -> entityId
   const remoteEnemyMap = new Map();      // netId -> entityId
+  const remoteStructureMap = new Map();  // netId -> entityId（host 广播过的建筑）
 
   function ensurePeerEntry(peerId, snapshotPeer) {
     if (!peerId || typeof peerId !== 'string') return null;
@@ -218,11 +219,78 @@
     }
   }
 
+  // 应用 host 广播的建筑状态。第一次见到 netId 时本地建出一个 ghost 实体，
+  // 此后只更新 hp / 类型特有状态。坐标在创建后不再变（建筑不会移动）。
+  function applyStructureUpdate(st) {
+    if (!st || !st.d || !st.k) return;
+    let entityId = remoteStructureMap.get(st.d);
+    // 防御：本地 structure runtime 在 hp<=0 时会自行 destroyEntity（与 host 几乎
+    // 同时触发），可能让 map 里残留指向已销毁实体的 id。若取到的 entityId 已
+    // 没有 structure 组件，把它当作不存在重新创建。
+    if (entityId && !getComponent(entityId, 'structure')) {
+      remoteStructureMap.delete(st.d);
+      entityId = null;
+    }
+    if (!entityId) {
+      if (typeof game.createStructureEntity !== 'function') return;
+      // slotIndex:-1 走和 enemy 一样的小技巧：creators.js 在 isInteger(slotIndex)
+      // 时不会调 registerChunkStructureEntity；且 fromChunk = false。本地建出的
+      // 是个"由 host 控制的 ghost"，不入 chunk 持久化。
+      entityId = game.createStructureEntity(st.k, st.x, st.y, {
+        hp: st.h,
+        slotIndex: -1,
+        state: st.st || {}
+      });
+      if (!entityId) return;
+      const structure = getComponent(entityId, 'structure');
+      if (structure) {
+        structure.chunkKey = null;
+        structure.fromChunk = false;
+      }
+      remoteStructureMap.set(st.d, entityId);
+    }
+    const transform = getComponent(entityId, 'transform');
+    const health = getComponent(entityId, 'health');
+    const structure = getComponent(entityId, 'structure');
+    if (transform) {
+      // 通常不变；防御性地纠正一次，处理 host 发来的位置修正
+      transform.x = st.x;
+      transform.y = st.y;
+    }
+    if (health) {
+      health.hp = st.h;
+      if (st.mh > 0) health.maxHp = st.mh;
+    }
+    if (structure && st.st && typeof st.st === 'object') {
+      for (const [key, value] of Object.entries(st.st)) {
+        structure[key] = value;
+      }
+    }
+  }
+
+  function removeRemoteStructure(netId) {
+    const entityId = remoteStructureMap.get(netId);
+    if (!entityId) return;
+    remoteStructureMap.delete(netId);
+    try {
+      game.removeChunkStructureEntity?.(entityId);
+    } catch (err) {
+      console.warn('[net/client] removeChunkStructureEntity failed', netId, err);
+    }
+    try {
+      game.destroyEntity?.(entityId);
+    } catch (err) {
+      console.warn('[net/client] destroyEntity (structure) failed', netId, err);
+    }
+  }
+
   function applyEntityDelta(data) {
     if (!active || !worldReady || !data || typeof data !== 'object') return;
     if (Array.isArray(data.r)) data.r.forEach(applyResourceUpdate);
     if (Array.isArray(data.e)) data.e.forEach(applyEnemyUpdate);
     if (Array.isArray(data.eR)) data.eR.forEach(removeRemoteEnemy);
+    if (Array.isArray(data.s)) data.s.forEach(applyStructureUpdate);
+    if (Array.isArray(data.sR)) data.sR.forEach(removeRemoteStructure);
   }
 
   function clientTick(dt) {
@@ -347,6 +415,7 @@
     state.players.clear();
     remoteResourceMap.clear();
     remoteEnemyMap.clear();
+    remoteStructureMap.clear();
     // 暂停本地游戏直到拿到 host 的种子；此时画面会保留单机世界，但 update
     // 已经被外部条件 (!state.playerId) 之外的逻辑限制。为了避免在等待期间
     // 看到旧世界的资源被采集等异常情况，这里把 running 暂时关掉。
@@ -364,6 +433,7 @@
     state.players.clear();
     remoteResourceMap.clear();
     remoteEnemyMap.clear();
+    remoteStructureMap.clear();
     state.netTick = 0;
   }
 

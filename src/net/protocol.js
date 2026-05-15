@@ -94,11 +94,13 @@
   //   r  - 处于"非初始状态"的资源（被砍/被打、正在重生）
   //   e  - 当前所有活着的敌人（位置 / hp / kind / 可选 chunkKey+slot）
   //   eR - 自上一帧起被销毁的敌人 netId 列表
+  //   s  - 当前所有存活的建筑（位置 + 状态：fuel / water / crop / growth …）
+  //   sR - 自上一帧起被销毁的建筑 netId 列表
   // chunk-bound 实体使用 `${group}:${chunkKey}:${slot}` 这种确定性 netId，
   // 客户端用同种子在本地生成的 entity 直接按 (chunkKey, slot) 查表配对；
   // host 端运行时动态生成的实体使用 `${group}:d:${counter}` 形式，由 host
   // 在 add/创建 路径上自增分配。
-  function makeEntityDelta({ tick, resources, enemies, removedEnemies, full } = {}) {
+  function makeEntityDelta({ tick, resources, enemies, removedEnemies, structures, removedStructures, full } = {}) {
     return {
       k: tick | 0,
       f: full ? 1 : 0,
@@ -122,7 +124,19 @@
         ck: enemy.chunkKey || '',
         s: typeof enemy.slotIndex === 'number' ? enemy.slotIndex : -1
       })),
-      eR: (removedEnemies || []).slice()
+      eR: (removedEnemies || []).slice(),
+      s: (structures || []).map((st) => ({
+        d: st.netId,
+        k: st.kind,
+        x: Math.round(st.x * 10) / 10,
+        y: Math.round(st.y * 10) / 10,
+        h: Math.round(st.hp || 0),
+        mh: Math.round(st.maxHp || 0),
+        // st: 类型特有状态子集（campfire.fuel / collector.water,fill /
+        // planter.crop,growth,ready）。值都是基础类型，可直接 JSON 透传。
+        st: st.state || {}
+      })),
+      sR: (removedStructures || []).slice()
     };
   }
 

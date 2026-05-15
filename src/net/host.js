@@ -30,6 +30,7 @@
     getComponent,
     getResourceIds,
     getEnemyIds,
+    getStructureIds,
     getEntityConfig,
     getEnemyConfig,
     getResourceDamage,
@@ -158,6 +159,8 @@
   // 上一帧标记为 dirty 的资源 netId 集合。资源从 dirty 转为 clean（重生回满）
   // 后会从 dirty 检测里掉出去，但需要再发一次"clean"状态让 client 看到恢复。
   let prevDirtyResourceNetIds = new Set();
+  // 上一帧广播过的活建筑 netId 集合；用于检测"被拆/烧毁"。
+  let prevStructureNetIds = new Set();
 
   function enemyNetId(enemyId) {
     const enemy = getComponent(enemyId, 'enemy');
@@ -176,6 +179,31 @@
     const node = getComponent(entityId, 'resourceNode');
     if (!node?.chunkKey || node.slotIndex < 0) return null;
     return `r:${node.chunkKey}:${node.slotIndex}`;
+  }
+
+  function structureNetId(entityId) {
+    const structure = getComponent(entityId, 'structure');
+    if (!structure) return null;
+    // 当前所有建筑都是 player-built（fromChunk=false），统一用 `s:d:<entityId>`。
+    // 若以后做出 "chunk 预生成的遗迹/废墟" 之类，可在此分支用 `s:chunkKey:slot`。
+    if (structure.fromChunk && structure.chunkKey && structure.slotIndex >= 0) {
+      return `s:${structure.chunkKey}:${structure.slotIndex}`;
+    }
+    return `s:d:${entityId}`;
+  }
+
+  // 抽取建筑的"可同步状态"。控制白名单避免 JSON.stringify 上意外字段。
+  function extractStructureState(structure) {
+    if (!structure) return {};
+    const out = {};
+    // 通用：燃烧 / 储水 / 作物。读取时容错：未定义字段不写入，减少包大小。
+    if (typeof structure.fuel === 'number') out.fuel = Math.round(structure.fuel * 10) / 10;
+    if (typeof structure.water === 'number') out.water = Math.round(structure.water * 100) / 100;
+    if (typeof structure.fill === 'number') out.fill = Math.round(structure.fill * 100) / 100;
+    if (typeof structure.crop !== 'undefined') out.crop = structure.crop || null;
+    if (typeof structure.growth === 'number') out.growth = Math.round(structure.growth * 100) / 100;
+    if (typeof structure.ready === 'boolean') out.ready = structure.ready;
+    return out;
   }
 
   function collectResourceUpdates(fullSync) {
@@ -236,21 +264,54 @@
     return { list, seen };
   }
 
+  function collectStructureUpdates() {
+    const list = [];
+    const seen = new Set();
+    if (typeof getStructureIds !== 'function') return { list, seen };
+    for (const entityId of getStructureIds()) {
+      const transform = getComponent(entityId, 'transform');
+      const health = getComponent(entityId, 'health');
+      const structure = getComponent(entityId, 'structure');
+      if (!transform || !structure) continue;
+      const id = structureNetId(entityId);
+      if (!id) continue;
+      seen.add(id);
+      list.push({
+        netId: id,
+        kind: structure.kind,
+        x: transform.x,
+        y: transform.y,
+        hp: health ? health.hp : 0,
+        maxHp: health ? health.maxHp : 0,
+        state: extractStructureState(structure)
+      });
+    }
+    return { list, seen };
+  }
+
   function broadcastEntityDelta(targetPeer, fullSync) {
     if (!active) return;
     const { list: resources, currentDirty } = collectResourceUpdates(!!fullSync);
     const { list: enemies, seen } = collectEnemyUpdates();
+    const { list: structures, seen: structuresSeen } = collectStructureUpdates();
     const removed = [];
+    const removedStructures = [];
     if (!targetPeer) {
       // 只在广播路径上做"消失检测"：peer-specific 的全量补帧不应该误删 ghost
       prevEnemyNetIds.forEach((id) => {
         if (!seen.has(id)) removed.push(id);
       });
+      prevStructureNetIds.forEach((id) => {
+        if (!structuresSeen.has(id)) removedStructures.push(id);
+      });
       prevEnemyNetIds = seen;
       prevDirtyResourceNetIds = currentDirty;
+      prevStructureNetIds = structuresSeen;
     }
     // 没有任何变化时不发，节省带宽
-    if (!fullSync && !targetPeer && resources.length === 0 && enemies.length === 0 && removed.length === 0) {
+    if (!fullSync && !targetPeer
+        && resources.length === 0 && enemies.length === 0 && removed.length === 0
+        && structures.length === 0 && removedStructures.length === 0) {
       return;
     }
     const payload = netMakeEntityDelta({
@@ -258,6 +319,8 @@
       resources,
       enemies,
       removedEnemies: removed,
+      structures,
+      removedStructures,
       full: !!fullSync
     });
     netTransport.send(NET_CHANNELS.ENTITY_DELTA, payload, targetPeer);
@@ -474,6 +537,7 @@
     entityDeltaAcc = 0;
     prevEnemyNetIds = new Set();
     prevDirtyResourceNetIds = new Set();
+    prevStructureNetIds = new Set();
     peerActionCooldown.clear();
   }
 
