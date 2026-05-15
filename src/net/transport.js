@@ -30,6 +30,7 @@
   ];
 
   let trysteroJoinRoom = null;
+  let trysteroSelfId = null;
   let room = null;
   let selfId = null;
   let currentRoomId = null;
@@ -50,6 +51,11 @@
     // 旧路径 'trystero/torrent' 会在运行时抛弃用错误。
     const mod = await import('@trystero-p2p/torrent');
     trysteroJoinRoom = mod.joinRoom;
+    // 真实的 Trystero selfId（模块加载时生成，全局唯一）。后续所有 channel 的
+    // receive 回调里 peerId 都是发送方的 Trystero selfId；我们必须用同一个 ID
+    // 作为本地玩家的标识，否则 Host 广播的 SNAPSHOT 里"客户端自己的条目"会
+    // 因为 ID 不匹配而被客户端误判为远端玩家，从而在客户端出现重影/拖影。
+    trysteroSelfId = mod.selfId || null;
     return trysteroJoinRoom;
   }
 
@@ -114,8 +120,11 @@
     }
     room = joinRoom(config, roomId);
     currentRoomId = roomId;
-    // Trystero 没有直接暴露 selfId，用随机短 ID 作为本地展示标识
-    selfId = 'self-' + Math.random().toString(36).slice(2, 8);
+    // 使用 Trystero 真实的 selfId 作为本机 peer 标识；这是 Trystero 在
+    // 各 channel 的 receive 回调中提供给对端的 ID，也是 SNAPSHOT 等消息里
+    // 需要匹配的 ID。若退而使用本地随机串，客户端会无法识别自己回传的
+    // 条目，导致 ghost 重叠（"拖影"bug）。
+    selfId = trysteroSelfId || ('self-' + Math.random().toString(36).slice(2, 8));
 
     room.onPeerJoin((peerId) => {
       peerJoinHandlers.forEach((fn) => {

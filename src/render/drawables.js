@@ -192,6 +192,33 @@
     ctx.restore();
   }
 
+  function drawPlayerNameLabel(name, color, bounce) {
+    if (!name) return;
+    ctx.font = '11px "Microsoft YaHei", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const labelWidth = ctx.measureText(name).width + 10;
+    const labelX = -labelWidth / 2;
+    const labelY = -28 - bounce;
+    ctx.fillStyle = 'rgba(8, 20, 30, 0.72)';
+    ctx.fillRect(labelX, labelY - 8, labelWidth, 14);
+    ctx.fillStyle = color || '#e6f6ff';
+    ctx.fillRect(labelX, labelY - 8, 3, 14);
+    ctx.fillStyle = '#f1f7ff';
+    ctx.fillText(name, 0, labelY - 1);
+  }
+
+  function getLocalPlayerLabel() {
+    const session = game.netSession;
+    if (!session || !session.state || !session.state.role) return null;
+    const selfId = game.netTransport?.getSelfId?.();
+    const selfPeer = selfId ? session.state.peers?.get(selfId) : null;
+    const name = selfPeer?.name || session.state.localName || '';
+    if (!name) return null;
+    const color = selfPeer?.color || session.state.localColor || '';
+    return { name, color };
+  }
+
   function drawPlayer(shakeX, shakeY) {
     const transform = getComponent(state.playerId, 'transform');
     const player = getComponent(state.playerId, 'player');
@@ -237,6 +264,15 @@
     } else {
       drawPlayerFrontFrame(bounce, legSwing, armSwing);
       drawHeldTool(toolKey, angle, 1 - bounce);
+    }
+
+    // 联机模式下给本机角色头顶也绘制名字气泡（房主能看见自己的名字）
+    const localLabel = getLocalPlayerLabel();
+    if (localLabel) {
+      const prevAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = 1;
+      drawPlayerNameLabel(localLabel.name, localLabel.color, bounce);
+      ctx.globalAlpha = prevAlpha;
     }
 
     ctx.restore();
@@ -341,20 +377,7 @@
     }
 
     // 昵称气泡
-    if (peer.name) {
-      ctx.font = '11px "Microsoft YaHei", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const labelWidth = ctx.measureText(peer.name).width + 10;
-      const labelX = -labelWidth / 2;
-      const labelY = -28 - bounce;
-      ctx.fillStyle = 'rgba(8, 20, 30, 0.72)';
-      ctx.fillRect(labelX, labelY - 8, labelWidth, 14);
-      ctx.fillStyle = peer.color || '#e6f6ff';
-      ctx.fillRect(labelX, labelY - 8, 3, 14);
-      ctx.fillStyle = '#f1f7ff';
-      ctx.fillText(peer.name, 0, labelY - 1);
-    }
+    drawPlayerNameLabel(peer.name, peer.color, bounce);
 
     ctx.restore();
   }
