@@ -90,6 +90,42 @@
     };
   }
 
+  // Host -> Client：实体增量。包含：
+  //   r  - 处于"非初始状态"的资源（被砍/被打、正在重生）
+  //   e  - 当前所有活着的敌人（位置 / hp / kind / 可选 chunkKey+slot）
+  //   eR - 自上一帧起被销毁的敌人 netId 列表
+  // chunk-bound 实体使用 `${group}:${chunkKey}:${slot}` 这种确定性 netId，
+  // 客户端用同种子在本地生成的 entity 直接按 (chunkKey, slot) 查表配对；
+  // host 端运行时动态生成的实体使用 `${group}:d:${counter}` 形式，由 host
+  // 在 add/创建 路径上自增分配。
+  function makeEntityDelta({ tick, resources, enemies, removedEnemies, full } = {}) {
+    return {
+      k: tick | 0,
+      f: full ? 1 : 0,
+      r: (resources || []).map((res) => ({
+        d: res.netId,            // string netId
+        ck: res.chunkKey,        // chunkKey 字符串（便于客户端兜底查找）
+        s: res.slotIndex | 0,
+        k: res.kind || '',
+        h: Math.round(res.hp || 0),
+        mh: Math.round(res.maxHp || 0),
+        a: res.alive ? 1 : 0,
+        rt: Math.max(0, Math.round((res.respawnTimer || 0) * 10) / 10)
+      })),
+      e: (enemies || []).map((enemy) => ({
+        d: enemy.netId,
+        k: enemy.kind,
+        x: Math.round(enemy.x * 10) / 10,
+        y: Math.round(enemy.y * 10) / 10,
+        h: Math.round(enemy.hp || 0),
+        mh: Math.round(enemy.maxHp || 0),
+        ck: enemy.chunkKey || '',
+        s: typeof enemy.slotIndex === 'number' ? enemy.slotIndex : -1
+      })),
+      eR: (removedEnemies || []).slice()
+    };
+  }
+
   Object.assign(game, {
     NET_PROTOCOL_VERSION: PROTOCOL_VERSION,
     NET_CHANNELS: CHANNELS,
@@ -98,6 +134,7 @@
     netMakePeerInfo: makePeerInfo,
     netMakeChat: makeChat,
     netMakeInput: makeInput,
-    netMakeSnapshot: makeSnapshot
+    netMakeSnapshot: makeSnapshot,
+    netMakeEntityDelta: makeEntityDelta
   });
 })(window.TidalIsle);

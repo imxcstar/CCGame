@@ -65,6 +65,7 @@
     const config = getStructureConfig(kind);
     if (!config) return null;
 
+    const fromChunk = Number.isInteger(options.slotIndex) && options.slotIndex >= 0;
     const entityId = createEntity(kind);
     addComponent(entityId, 'transform', { x, y });
     addComponent(entityId, 'collider', { radius: config.radius || 0 });
@@ -78,7 +79,10 @@
       ...(config.initialState?.() || {}),
       ...(options.state || {}),
       chunkKey: options.chunkKey || null,
-      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1
+      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1,
+      // 联机用：true 表示由 chunk hydration 创建（在 host/client 端 chunkKey+slot 一致）；
+      // false 表示运行时动态构建（player-built），netId 需 host 端单独分配。
+      fromChunk
     });
     if (!Number.isInteger(options.slotIndex) && typeof game.registerChunkStructureEntity === 'function') {
       game.registerChunkStructureEntity(entityId);
@@ -90,6 +94,7 @@
     const config = getEnemyConfig(kind);
     if (!config) return null;
 
+    const fromChunk = Number.isInteger(options.slotIndex) && options.slotIndex >= 0;
     const hp = options.hp ?? (config.baseHp + state.day * config.hpPerDay);
     const speed = options.speed ?? (config.speedBase + Math.min(24, state.day * config.speedPerDay));
     const entityId = createEntity(kind);
@@ -103,7 +108,9 @@
       wanderAngle: options.wanderAngle ?? Math.random() * Math.PI * 2,
       wanderTime: options.wanderTime ?? randomBetween(1.2, 3.6),
       chunkKey: options.chunkKey || null,
-      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1
+      slotIndex: Number.isInteger(options.slotIndex) ? options.slotIndex : -1,
+      // 与 structure 同理：标记是否由 chunk 生成（决定 netId 算法）
+      fromChunk
     });
     if (!Number.isInteger(options.slotIndex) && typeof game.registerChunkEnemyEntity === 'function') {
       game.registerChunkEnemyEntity(entityId);
