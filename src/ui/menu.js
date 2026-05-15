@@ -43,6 +43,7 @@
       if (!menuState) return;
       useItemReference(menuState.source, menuState.index);
       closeItemMenu();
+      game.closeTooltip?.();
       game.updateUI();
     });
 
@@ -50,6 +51,7 @@
       if (!menuState) return;
       dropItemReference(menuState.source, menuState.index);
       closeItemMenu();
+      game.closeTooltip?.();
       game.updateUI();
     });
 

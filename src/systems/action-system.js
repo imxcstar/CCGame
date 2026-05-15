@@ -630,6 +630,7 @@
     state.shake = Math.max(state.shake, 4);
     health.hp -= getResourceDamage('hands', resourceId);
     health.hitTimer = 0.18;
+    game.playSound?.('chop');
     if (health.hp <= 0) {
       harvestResource(resourceId);
       clearSelectedWorldTarget();
@@ -857,6 +858,7 @@
       if (!health || !resourceNode?.alive) return false;
       health.hp -= damage;
       health.hitTimer = 0.18;
+      game.playSound?.('chop');
       if (health.hp <= 0) harvestResource(target.id);
       return true;
     }
