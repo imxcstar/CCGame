@@ -34,6 +34,7 @@
 
     const meat = rollEnemyMeat(enemy.kind);
     burst(transform.x, transform.y, '#ffd37c', 10, 70);
+    game.playSound?.('kill');
     if (meat > 0) {
       const result = addInventory({ meat });
       const gained = result.added.meat || 0;
@@ -54,6 +55,7 @@
     health.hp -= damage;
     health.hitTimer = 0.18;
     burst(transform.x, transform.y, '#ff7a8d', 7, 62);
+    game.playSound?.('hit');
 
     const angle = Math.atan2(transform.y - player.transform.y, transform.x - player.transform.x);
     moveActorEntity(entityId, Math.cos(angle) * 10, Math.sin(angle) * 10);

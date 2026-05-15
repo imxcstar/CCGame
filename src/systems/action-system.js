@@ -150,6 +150,7 @@
     state.fishing.ripple = 0.55;
     state.fishing.animationTime = 0;
     burst(target.x, target.y, '#8fd9ff', 4, 16);
+    game.playSound?.('cast');
     showMessage('抛竿入水，等浮标下沉再收线');
     return true;
   }
@@ -179,6 +180,7 @@
     burst(state.fishing.x, state.fishing.y, '#b7f1ff', 8, 26);
     state.shake = Math.max(state.shake, 1.2);
     resetFishingState();
+    game.playSound?.('catch');
     showMessage('钓到 ' + text);
     return true;
   }
@@ -223,6 +225,7 @@
       state.fishing.reelWindow = randomBetween(0.6, 1.0);
       state.fishing.ripple = 1;
       burst(state.fishing.x, state.fishing.y, '#d9f7ff', 6, 22);
+      game.playSound?.('bite');
       showMessage('有鱼咬钩了，左键收竿', 1.1);
       return;
     }
@@ -395,6 +398,7 @@
       removeItemFromInventory(player.inventory, 'wood', 1);
       structure.fuel = Math.min(120, (structure.fuel || 0) + 28);
       burst(transform.x, transform.y, '#ffca74', 6, 28);
+      game.playSound?.('fire');
       showMessage('篝火添柴 +1');
       setScore();
       return true;
@@ -410,6 +414,7 @@
       player.survival.thirst = Math.min(100, player.survival.thirst + 34);
       player.survival.energy = Math.min(100, player.survival.energy + 6);
       burst(transform.x, transform.y, '#81e7ff', 7, 30);
+      game.playSound?.('drink');
       showMessage('取水成功');
       return true;
     }
@@ -426,6 +431,7 @@
         structure.growth = 0;
         structure.ready = false;
         burst(transform.x, transform.y, '#9fd77c', 6, 24);
+        game.playSound?.('build');
         showMessage('种下了一包混合种子');
         setScore();
         return true;
@@ -447,6 +453,7 @@
       structure.growth = 0;
       structure.ready = false;
       burst(transform.x, transform.y, '#ffb562', 8, 28);
+      game.playSound?.('harvest');
       showMessage('收获了 2 个南瓜');
       setScore();
       return true;
@@ -481,6 +488,7 @@
     structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
     addInventory({ grilledFish: 1 });
     burst(transform.x, transform.y, '#ffc887', 7, 28);
+    game.playSound?.('fire');
     showMessage('烹饪完成：烤鱼');
     setScore();
     return true;
@@ -512,6 +520,7 @@
     removeItemFromInventory(player.inventory, 'wood', woodToUse);
     structure.fuel = Math.min(120, (structure.fuel || 0) + woodToUse * 28);
     burst(transform.x, transform.y, '#ffca74', 6 + woodToUse, 28 + woodToUse * 3);
+    game.playSound?.('fire');
     showMessage(fillAll ? '篝火已添满柴火' : '篝火添柴 +' + woodToUse);
     setScore();
     return true;
@@ -537,6 +546,7 @@
     player.survival.thirst = Math.min(100, player.survival.thirst + amount * 34);
     player.survival.energy = Math.min(100, player.survival.energy + amount * 6);
     burst(transform.x, transform.y, '#81e7ff', 6 + amount, 30 + amount * 2);
+    game.playSound?.('drink');
     showMessage(all ? '畅饮了 ' + amount + ' 份淡水' : '取水成功');
     return true;
   }
@@ -566,6 +576,7 @@
     spendInventoryCost(player.inventory, repairCost);
     health.hp = health.maxHp;
     burst(transform.x, transform.y, '#93f59a', 8, 34);
+    game.playSound?.('build');
     showMessage('修理完成');
     setScore();
     return true;
@@ -592,6 +603,7 @@
     destroyEntity(structureId);
     addInventory({ [structure.kind]: 1 });
     burst(transform.x, transform.y, '#83f5ce', 10, 42);
+    game.playSound?.('drop');
     clearSelectedWorldTarget();
     setScore();
     showMessage('已拆卸 ' + (getStructureConfig(structure.kind)?.name || item.name));

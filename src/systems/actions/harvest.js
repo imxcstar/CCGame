@@ -43,6 +43,7 @@
 
     const result = addInventory(loot);
     if (config.burst) burst(transform.x, transform.y, config.burst.color, config.burst.count);
+    game.playSound?.('harvest');
 
     const text = Object.entries(result.added)
       .map(([key, value]) => '+' + value + ' ' + RESOURCE_NAMES[key])

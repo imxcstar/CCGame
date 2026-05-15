@@ -31,6 +31,7 @@
       button.type = 'button';
       button.addEventListener('click', () => {
         if (state.over) return;
+        game.playSound?.('click');
         craftItem(key);
       });
       craftButtons.set(key, button);

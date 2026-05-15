@@ -92,6 +92,7 @@
         const knockback = Math.atan2(player.transform.y - transform.y, player.transform.x - transform.x);
         moveActorEntity(state.playerId, Math.cos(knockback) * 14, Math.sin(knockback) * 14);
         burst(player.transform.x, player.transform.y, '#ff8596', 10, 72);
+        game.playSound?.('damage');
       }
 
       if (health.hp <= 0) {

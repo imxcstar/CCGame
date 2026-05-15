@@ -19,6 +19,24 @@
 
       if (event.code === 'KeyE') game.interact?.();
       if (event.code === 'Escape') game.closeItemMenu?.();
+
+      // 面板显示 / 隐藏快捷键（避免拦截输入框 / 修饰键组合）
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        const tag = event.target?.tagName;
+        const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || event.target?.isContentEditable;
+        if (!isEditable) {
+          if (event.code === 'KeyM') {
+            game.togglePanel?.('minimapPanel');
+            event.preventDefault();
+          } else if (event.code === 'KeyB') {
+            game.togglePanel?.('inventoryPanel');
+            event.preventDefault();
+          } else if (event.code === 'KeyC') {
+            game.togglePanel?.('craftPanel');
+            event.preventDefault();
+          }
+        }
+      }
     });
 
     window.addEventListener('keyup', (event) => {

@@ -90,6 +90,7 @@
     createStructureEntity(preview.kind, preview.x, preview.y);
     burst(preview.x, preview.y, '#83f5ce', 10, 44);
     state.shake = Math.max(state.shake, 2);
+    game.playSound?.('build');
     showMessage('建造完成：' + getItemConfig(preview.itemKey).name);
     setScore();
     return true;

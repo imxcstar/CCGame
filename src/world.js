@@ -68,6 +68,7 @@
     if (state.fishing) state.fishing.active = false;
     dom.gameOverText.textContent = `你撑到了第 ${state.day} 天 ${getTimeLabel()}，最终评分 ${state.score}。重新整理营地，再试一次。`;
     dom.gameOverOverlay.classList.add('show');
+    game.playSound?.('gameover');
   }
 
   function update(dt, activeKeys) {

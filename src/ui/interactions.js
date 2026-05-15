@@ -64,6 +64,7 @@
     dom.worldTargetPanelEl?.addEventListener('click', (event) => {
       const button = event.target.closest?.('[data-world-action]');
       if (!button) return;
+      game.playSound?.('click');
       runSelectedWorldTargetAction?.(button.dataset.worldAction);
       game.updateUI?.();
     });
@@ -82,6 +83,8 @@
 
   function bindOverlayButtons() {
     dom.startBtn.addEventListener('click', () => {
+      game.unlockAudio?.();
+      game.playSound?.('start');
       dom.startOverlay.classList.remove('show');
       dom.gameOverOverlay.classList.remove('show');
       state.running = true;
@@ -90,6 +93,8 @@
     });
 
     dom.restartBtn.addEventListener('click', () => {
+      game.unlockAudio?.();
+      game.playSound?.('start');
       dom.gameOverOverlay.classList.remove('show');
       game.newGame();
       dom.startOverlay.classList.remove('show');
