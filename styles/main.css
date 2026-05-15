@@ -1316,3 +1316,249 @@ body.touch-mode .mobile-controls {
     font-size: 11px;
   }
 }
+
+/* ============================================================
+ * 联机房间面板
+ * ============================================================ */
+
+.multiplayer-card {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.mp-section {
+  margin-bottom: 16px;
+}
+
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.mp-field input,
+.mp-join-row input,
+.mp-chat-form input {
+  border: 2px solid var(--border-color-light);
+  background: var(--bg-color-input);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--text-color-body);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.mp-field input:focus,
+.mp-join-row input:focus,
+.mp-chat-form input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-color-bg);
+}
+
+.mp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mp-join-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.mp-join-row input {
+  flex: 1 1 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.mp-join-row button {
+  flex: 0 0 auto;
+}
+
+.mp-error {
+  min-height: 20px;
+  color: var(--error-color-active);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.mp-room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mp-room-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--text-color);
+}
+
+.mp-mini-btn {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mp-room-status {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--primary-color-bg);
+  color: var(--primary-color-active);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.mp-room-status[data-status="connecting"] {
+  background: #fff3d6;
+  color: #b88a0e;
+}
+
+.mp-room-status[data-status="error"] {
+  background: #ffe1e1;
+  color: var(--error-color-active);
+}
+
+.mp-room-status[data-status="idle"] {
+  background: var(--bg-color-secondary);
+  color: var(--text-color-secondary);
+}
+
+.mp-peers {
+  margin-bottom: 14px;
+}
+
+.mp-peer-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.mp-peer-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--bg-color-secondary);
+  font-weight: 600;
+  color: var(--text-color-body);
+}
+
+.mp-peer-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.mp-peer-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary-color-bg);
+  color: var(--primary-color-active);
+  font-weight: 700;
+}
+
+.mp-peer-tag.local {
+  background: #fff3d6;
+  color: #b88a0e;
+}
+
+.mp-peer-latency {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-color-secondary);
+}
+
+.mp-chat-log {
+  height: 180px;
+  overflow-y: auto;
+  border: 2px solid var(--border-color-light);
+  border-radius: 16px;
+  background: var(--bg-color-input);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.mp-chat-entry {
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.mp-chat-entry .name {
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.mp-chat-entry.system {
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+.mp-chat-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mp-chat-form input {
+  flex: 1 1 auto;
+}
+
+.mp-chat-form button {
+  flex: 0 0 auto;
+}
+
+.mp-room-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.mp-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-color-secondary);
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .mp-join-row {
+    flex-direction: column;
+  }
+
+  .mp-room-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mp-chat-log {
+    height: 140px;
+  }
+}

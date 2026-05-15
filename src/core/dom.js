@@ -26,7 +26,27 @@
     itemMenuUseBtn: document.getElementById('itemMenuUseBtn'),
     itemMenuBindBtn: document.getElementById('itemMenuBindBtn'),
     itemMenuDropBtn: document.getElementById('itemMenuDropBtn'),
-    itemMenuClearBtn: document.getElementById('itemMenuClearBtn')
+    itemMenuClearBtn: document.getElementById('itemMenuClearBtn'),
+
+    // 联机
+    openMultiplayerBtn: document.getElementById('openMultiplayerBtn'),
+    multiplayerOverlay: document.getElementById('multiplayerOverlay'),
+    mpNameInput: document.getElementById('mpNameInput'),
+    mpLobbyActions: document.getElementById('mpLobbyActions'),
+    mpHostBtn: document.getElementById('mpHostBtn'),
+    mpJoinCodeInput: document.getElementById('mpJoinCodeInput'),
+    mpJoinBtn: document.getElementById('mpJoinBtn'),
+    mpError: document.getElementById('mpError'),
+    mpRoomSection: document.getElementById('mpRoomSection'),
+    mpRoomCode: document.getElementById('mpRoomCode'),
+    mpCopyCodeBtn: document.getElementById('mpCopyCodeBtn'),
+    mpRoomStatus: document.getElementById('mpRoomStatus'),
+    mpPeerList: document.getElementById('mpPeerList'),
+    mpChatLog: document.getElementById('mpChatLog'),
+    mpChatForm: document.getElementById('mpChatForm'),
+    mpChatInput: document.getElementById('mpChatInput'),
+    mpLeaveBtn: document.getElementById('mpLeaveBtn'),
+    mpCloseBtn: document.getElementById('mpCloseBtn')
   };
 
   const view = {
