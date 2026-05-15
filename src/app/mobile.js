@@ -163,32 +163,37 @@
   }
 
   // ----------------------------------------------------------------
-  // 面板切换：手机上隐藏左右面板，按按钮临时显示
+  // 面板切换：手机上隐藏可切换面板（小地图 / 背包 / 制作），
+  // 状态 HUD 始终可见。点同一按钮可再次关闭；任一时刻最多打开一个
   // ----------------------------------------------------------------
   function bindPanelToggles() {
-    const leftToggle = document.getElementById('togglePanelLeft');
-    const rightToggle = document.getElementById('togglePanelRight');
-    const leftPanel = document.querySelector('.panel.left');
-    const rightPanel = document.querySelector('.panel.right');
+    const toggles = [
+      { btnId: 'togglePanelMinimap', panelId: 'minimapPanel' },
+      { btnId: 'togglePanelInventory', panelId: 'inventoryPanel' },
+      { btnId: 'togglePanelCraft', panelId: 'craftPanel' }
+    ];
 
-    function setPanelVisible(panel, toggle, visible) {
-      if (!panel || !toggle) return;
-      panel.classList.toggle('show-mobile', visible);
-      toggle.classList.toggle('active', visible);
+    const entries = toggles
+      .map(({ btnId, panelId }) => ({
+        btn: document.getElementById(btnId),
+        panel: document.getElementById(panelId)
+      }))
+      .filter((entry) => entry.btn && entry.panel);
+
+    function setVisible(entry, visible) {
+      entry.panel.classList.toggle('show-mobile', visible);
+      entry.btn.classList.toggle('active', visible);
     }
 
-    function toggle(panel, toggleBtn, otherPanel, otherToggle) {
-      const visible = !panel.classList.contains('show-mobile');
-      setPanelVisible(panel, toggleBtn, visible);
-      if (visible) setPanelVisible(otherPanel, otherToggle, false);
-    }
-
-    leftToggle?.addEventListener('click', () => {
-      toggle(leftPanel, leftToggle, rightPanel, rightToggle);
-    });
-
-    rightToggle?.addEventListener('click', () => {
-      toggle(rightPanel, rightToggle, leftPanel, leftToggle);
+    entries.forEach((entry) => {
+      entry.btn.addEventListener('click', () => {
+        const willOpen = !entry.panel.classList.contains('show-mobile');
+        // 关闭其他面板，确保同一时刻只有一个面板可见
+        entries.forEach((other) => {
+          if (other !== entry) setVisible(other, false);
+        });
+        setVisible(entry, willOpen);
+      });
     });
   }
 
