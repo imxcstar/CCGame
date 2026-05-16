@@ -160,7 +160,7 @@ body {
 
 /* ---- 桌面默认布局：把生命等数值条放到屏幕上方，
    状态卡片不再放在左侧列里，而是固定到顶部居中。
-   减少左侧宽度占用，并让画面更紧凑。 ---- */
+   去除容器背景与说明文案，让每条信息条自带背景。 ---- */
 .panel-status {
   position: fixed;
   top: 12px;
@@ -168,11 +168,14 @@ body {
   transform: translateX(-50%);
   width: min(560px, calc(100vw - 320px));
   max-height: none;
-  padding: 8px 14px;
-  border-radius: 18px;
-  background: rgba(247, 243, 223, 0.86);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
   z-index: 6;
 }
 
@@ -181,43 +184,45 @@ body {
   gap: 4px;
   background: transparent;
   border: none;
+  box-shadow: none;
 }
 
 /* 桌面端：4 条生命数值横向排列，节约垂直高度 */
 .panel-status .bars {
   grid-template-columns: repeat(4, 1fr);
-  gap: 4px 12px;
+  gap: 6px 10px;
 }
 
+/* 每条信息条自带背景（文本 + 进度条 + 数值） */
 .panel-status .bar {
   grid-template-columns: 28px 1fr 26px;
   gap: 6px;
   font-size: 11px;
   font-weight: 700;
+  padding: 4px 10px;
+  background: rgba(247, 243, 223, 0.86);
+  border: 1.5px solid var(--border-color-light);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+  min-width: 0;
 }
 
 .panel-status .bar-track {
   height: 8px;
   border-width: 1.5px;
+  min-width: 0;
 }
 
-/* 桌面端：状态卡里大量辅助文字（操作说明 / 评分等）默认隐藏，避免占高度。
-   重要的提示（message / hint）保留显示。 */
+/* 桌面端：状态卡里所有辅助/说明文案默认隐藏（操作说明 / 评分 / message / hint 等），
+   只保留 4 条带背景的信息条。 */
 .panel-status .status-row,
 .panel-status .controls,
-.panel-status .brand {
-  display: none;
-}
-
+.panel-status .brand,
 .panel-status .message,
 .panel-status .hint {
-  text-align: center;
-  font-size: 12px;
-  margin: 0;
-}
-
-.panel-status .message:empty,
-.panel-status .hint:empty {
   display: none;
 }
 
@@ -1226,7 +1231,7 @@ body.touch-mode .mobile-controls {
   }
 
   /* 移动端：状态 HUD 放到屏幕左上角（紧凑型），把按钮腾给右上。
-     不再使用容器背景 / 模糊，让数值条裸露在画面上更轻量。 */
+     容器无背景；每条信息条自带背景。 */
   .panel-status {
     position: fixed;
     top: 10px;
@@ -1234,6 +1239,7 @@ body.touch-mode .mobile-controls {
     right: auto;
     /* 留出右侧约 78px 给 panel-toggles（按钮宽 48 + 边距） */
     width: min(220px, calc(100vw - 88px));
+    max-width: calc(100vw - 20px);
     max-height: none;
     padding: 0;
     border: none;
@@ -1255,7 +1261,7 @@ body.touch-mode .mobile-controls {
     box-shadow: none;
   }
 
-  /* 状态 HUD 内：隐藏非必要文本，只保留 4 条紧凑生命条 */
+  /* 状态 HUD 内：隐藏所有非必要文本（包括 message / hint），只保留 4 条自带背景的信息条 */
   .panel-status .status-row,
   .panel-status .message,
   .panel-status .hint,
@@ -1267,19 +1273,31 @@ body.touch-mode .mobile-controls {
   /* 数值条改为单列纵向排列 */
   .panel-status .bars {
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: 6px;
+    min-width: 0;
   }
 
+  /* 每条信息条自带背景 */
   .panel-status .bar {
     grid-template-columns: 28px 1fr 28px;
     gap: 6px;
     font-size: 11px;
     font-weight: 700;
+    padding: 4px 10px;
+    background: rgba(247, 243, 223, 0.86);
+    border: 1.5px solid var(--border-color-light);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    pointer-events: auto;
+    min-width: 0;
   }
 
   .panel-status .bar-track {
     height: 8px;
     border-width: 1.5px;
+    min-width: 0;
   }
 
   /* 小地图卡片里的品牌（标题 + 日期）：移动端显示在小地图面板内 */
