@@ -83,7 +83,7 @@ npm run build
 
 ## 联机功能（实验性）
 
-基于 **WebRTC + Trystero** 实现的零后端联机：使用公共 BitTorrent tracker 作为 WebRTC 信令通道，不需要自建服务器。
+基于 **WebRTC + Trystero** 实现的零后端联机：默认使用公共 BitTorrent tracker 作为 WebRTC 信令通道，不需要自建服务器。如公共 tracker 在你所在的网络下被屏蔽或不稳定（房间大厅扫不到房间、加入后看不到房主），可在联机弹窗右上角的 ⚙ 设置里切换到 **自定义 WebSocket 中转服务器**。
 
 ### 使用方法
 
@@ -94,16 +94,99 @@ npm run build
 5. 进入房间后可在面板内文字聊天、查看成员列表、显示与各 peer 的实时延迟。
 6. 点击「离开房间」断开连接。
 
+### 自定义中转服务器
+
+点击联机弹窗右上角 ⚙ 按钮可打开「自定义中转服务器」设置：
+
+- **公共 BitTorrent tracker**（默认）：无需任何服务器，但在部分网络下可能不稳定。
+- **自定义 WebSocket 中转**：使用 `@trystero-p2p/ws-relay` 协议，需要你自建一台轻量级中转服务器（仅承担 WebRTC 信令转发，**不会承载游戏数据**——P2P 建立后所有数据仍然端到端加密直传）。
+
+设置保存在浏览器本地（localStorage），下次自动读取使用。**同一房间内所有玩家必须使用相同的中转服务器地址**才能互相发现，请把地址连同房间码一起分享给好友。
+
+### 自建中转服务器
+
+`@trystero-p2p/ws-relay` 提供了一份非常小的 WebSocket 信令服务器，**只负责帮助玩家互相发现，不存储任何游戏数据**，几行代码就能运行起来。
+
+#### 1. 准备一台公网服务器
+
+任何能跑 Node.js 18+ 的 VPS / 云主机即可。如需通过 `wss://`（强烈推荐）访问，需要绑定一个域名并配置 TLS（自建可用 Caddy / Nginx 反代，也可以由 Cloudflare 之类的服务商终结 TLS 再回源到 `ws://`）。
+
+#### 2. 安装并启动 relay
+
+新建一个空目录，初始化并安装：
+
+```bash
+mkdir ccgame-relay && cd ccgame-relay
+npm init -y
+npm install @trystero-p2p/ws-relay
+```
+
+新建 `server.js`：
+
+```js
+import { createWsRelayServer } from '@trystero-p2p/ws-relay/server';
+
+createWsRelayServer({ port: 8080 });
+console.log('CCGame relay listening on ws://0.0.0.0:8080');
+```
+
+`package.json` 中加上 `"type": "module"`，然后启动：
+
+```bash
+node server.js
+```
+
+建议通过 `systemd` / `pm2` / `docker` 等方式保活：
+
+```bash
+# 使用 pm2 简单跑起来
+npm install -g pm2
+pm2 start server.js --name ccgame-relay
+pm2 save
+```
+
+#### 3. 配置 TLS（推荐）
+
+浏览器在 `https://` 页面下只允许连接 `wss://`，所以生产环境一定要走 TLS。
+
+使用 Caddy 作为反向代理是最快的方案（自动申请 Let's Encrypt 证书）。`Caddyfile` 示例：
+
+```caddy
+relay.example.com {
+  reverse_proxy 127.0.0.1:8080
+}
+```
+
+`caddy run` 后即可通过 `wss://relay.example.com` 连接。
+
+#### 4. 在游戏里启用
+
+1. 打开联机弹窗，点击右上角 ⚙。
+2. 选择「自定义 WebSocket 中转」。
+3. 在文本框中填入服务器地址（每行一条，可填多个做冗余）：
+
+   ```text
+   wss://relay.example.com
+   ```
+
+4. 点击「保存并应用」。
+5. 把"中转服务器地址 + 房间码"一起分享给好友——所有人必须设置相同的服务器，才能在同一个房间里互相发现。
+
+#### 5. 防火墙 / 端口
+
+- 自建在 8080：放行入站 TCP/8080（或经由 Caddy 反代时只需放行 80/443）。
+- 中转服务器只在 WebRTC 握手阶段被使用，建立连接后玩家之间直接 P2P 通讯，所以即使你的 relay 带宽不大也完全够用。
+
 ### 当前能力与后续计划
 
-- **当前版本**：仅实现联机基础设施（房间创建/加入、成员同步、聊天）。游戏世界本身仍为单机权威，多玩家世界同步将在后续版本中提供。
+- **当前版本**：实现联机基础设施（房间创建/加入、成员同步、聊天、自定义中转服务器、世界增量同步）。
 - **后续步骤**：玩家状态多实例化 → Host 权威的输入/移动同步 → 世界对象与昼夜增量同步 → 行为请求-确认 → 多玩家背包与合成。
 
 ### 网络说明
 
 - 默认使用公共 STUN（Google / Cloudflare）。绝大多数家庭网络可直接 P2P 互联。
 - 在严格 NAT 环境下 WebRTC 可能无法穿透；遇到连接失败时可换用其他网络或加入自带 TURN（后续 UI 选项）。
-- 信令依赖公共 BitTorrent tracker，部分受限网络可能屏蔽，可考虑切换 strategy（Nostr / MQTT，后续可选）。
+- 默认信令依赖公共 BitTorrent tracker，受限网络可能屏蔽；遇到大厅扫不到房间 / 进房后看不见房主等情况，请按上文「自建中转服务器」搭建一台中转。
 
 ## 项目结构
 

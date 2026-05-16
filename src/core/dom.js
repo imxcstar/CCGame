@@ -53,7 +53,19 @@
     mpChatForm: document.getElementById('mpChatForm'),
     mpChatInput: document.getElementById('mpChatInput'),
     mpLeaveBtn: document.getElementById('mpLeaveBtn'),
-    mpCloseBtn: document.getElementById('mpCloseBtn')
+    mpCloseBtn: document.getElementById('mpCloseBtn'),
+
+    // 联机：自定义中转服务器设置
+    mpSettingsBtn: document.getElementById('mpSettingsBtn'),
+    mpServerSettingsOverlay: document.getElementById('mpServerSettingsOverlay'),
+    mpStrategyTorrent: document.getElementById('mpStrategyTorrent'),
+    mpStrategyWsRelay: document.getElementById('mpStrategyWsRelay'),
+    mpRelayUrlsField: document.getElementById('mpRelayUrlsField'),
+    mpRelayUrlsInput: document.getElementById('mpRelayUrlsInput'),
+    mpServerSettingsError: document.getElementById('mpServerSettingsError'),
+    mpServerSettingsSaveBtn: document.getElementById('mpServerSettingsSaveBtn'),
+    mpServerSettingsCancelBtn: document.getElementById('mpServerSettingsCancelBtn'),
+    mpServerSettingsResetBtn: document.getElementById('mpServerSettingsResetBtn')
   };
 
   const view = {

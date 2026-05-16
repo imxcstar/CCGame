@@ -451,11 +451,101 @@
     dom.mpNameInput.addEventListener('change', handleNameChange);
     dom.mpNameInput.addEventListener('blur', handleNameChange);
 
+    bindServerSettings();
+
     netSession.on('change', () => refreshView());
     netSession.on('chat', () => renderChat());
 
     startLatencyTimer();
     refreshView();
+  }
+
+  // ---- 自定义中转服务器设置 ----
+
+  function openServerSettings() {
+    const cfg = game.netServerConfig?.getServerConfig?.() || { strategy: 'torrent', relayUrls: [] };
+    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = cfg.strategy !== 'ws-relay';
+    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = cfg.strategy === 'ws-relay';
+    if (dom.mpRelayUrlsInput) dom.mpRelayUrlsInput.value = (cfg.relayUrls || []).join('\n');
+    if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '';
+    syncServerSettingsFieldVisibility();
+    dom.mpServerSettingsOverlay?.classList.add('show');
+  }
+
+  function closeServerSettings() {
+    dom.mpServerSettingsOverlay?.classList.remove('show');
+  }
+
+  function syncServerSettingsFieldVisibility() {
+    const useRelay = !!dom.mpStrategyWsRelay?.checked;
+    if (dom.mpRelayUrlsField) dom.mpRelayUrlsField.hidden = !useRelay;
+  }
+
+  function parseRelayUrls(text) {
+    return String(text || '')
+      .split(/[\r\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function handleSaveServerSettings() {
+    if (!game.netServerConfig) return;
+    const useRelay = !!dom.mpStrategyWsRelay?.checked;
+    const urls = parseRelayUrls(dom.mpRelayUrlsInput?.value || '');
+    if (useRelay) {
+      if (urls.length === 0) {
+        if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '请填写至少一个 wss:// 或 ws:// 地址。';
+        return;
+      }
+      const bad = urls.find((u) => !/^wss?:\/\//i.test(u));
+      if (bad) {
+        if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '地址必须以 wss:// 或 ws:// 开头：' + bad;
+        return;
+      }
+    }
+    game.netServerConfig.setServerConfig({
+      strategy: useRelay ? 'ws-relay' : 'torrent',
+      relayUrls: useRelay ? urls : []
+    });
+    closeServerSettings();
+    setError('已应用新的中转服务器设置。如已在房间中，连接已断开，请重新创建 / 加入房间。');
+  }
+
+  function handleResetServerSettings() {
+    if (!game.netServerConfig) return;
+    game.netServerConfig.resetServerConfig();
+    const cfg = game.netServerConfig.getServerConfig();
+    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = cfg.strategy !== 'ws-relay';
+    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = cfg.strategy === 'ws-relay';
+    if (dom.mpRelayUrlsInput) dom.mpRelayUrlsInput.value = (cfg.relayUrls || []).join('\n');
+    syncServerSettingsFieldVisibility();
+    if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '';
+  }
+
+  function bindServerSettings() {
+    if (!dom.mpSettingsBtn || !dom.mpServerSettingsOverlay) return;
+    dom.mpSettingsBtn.addEventListener('click', () => {
+      game.playSound?.('click');
+      openServerSettings();
+    });
+    dom.mpServerSettingsCancelBtn?.addEventListener('click', () => {
+      game.playSound?.('click');
+      closeServerSettings();
+    });
+    dom.mpServerSettingsSaveBtn?.addEventListener('click', () => {
+      game.playSound?.('click');
+      handleSaveServerSettings();
+    });
+    dom.mpServerSettingsResetBtn?.addEventListener('click', () => {
+      game.playSound?.('click');
+      handleResetServerSettings();
+    });
+    dom.mpStrategyTorrent?.addEventListener('change', syncServerSettingsFieldVisibility);
+    dom.mpStrategyWsRelay?.addEventListener('change', syncServerSettingsFieldVisibility);
+    // 点遮罩区域关闭
+    dom.mpServerSettingsOverlay.addEventListener('click', (event) => {
+      if (event.target === dom.mpServerSettingsOverlay) closeServerSettings();
+    });
   }
 
   Object.assign(game, {
