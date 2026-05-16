@@ -245,6 +245,17 @@
     const armSwing = player.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
     const bounce = player.isMoving ? Math.abs(Math.sin(walkPhase)) * 1.4 : 0;
 
+    // 攻击 / 砍树：手部上下小角度抖两下（不再触发画面抖动）。
+    // attackCooldown 起始为 0.26s，progress 从 0→1 期间播放 2 个完整正弦周期 = 2 次上下抖动，
+    // 末段振幅逐步衰减回 0，过渡更自然。
+    const ATTACK_SWING_DURATION = 0.26;
+    let attackSwing = 0;
+    if (player.attackCooldown > 0) {
+      const progress = clamp(1 - player.attackCooldown / ATTACK_SWING_DURATION, 0, 1);
+      attackSwing = Math.sin(progress * Math.PI * 4) * 0.32 * (1 - progress);
+    }
+    const heldAngle = angle + attackSwing;
+
     ctx.save();
     ctx.translate(screen.x, screen.y);
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -256,15 +267,15 @@
     if (player.facing === 'up') {
       ctx.save();
       ctx.globalAlpha *= 0.85;
-      drawHeldTool(toolKey, angle, 1 - bounce);
+      drawHeldTool(toolKey, heldAngle, 1 - bounce);
       ctx.restore();
       drawPlayerBackFrame(bounce, legSwing, armSwing);
     } else if (player.facing === 'left' || player.facing === 'right') {
       drawPlayerSideFrame(player.facing, bounce, legSwing, armSwing);
-      drawHeldTool(toolKey, angle, 1 - bounce);
+      drawHeldTool(toolKey, heldAngle, 1 - bounce);
     } else {
       drawPlayerFrontFrame(bounce, legSwing, armSwing);
-      drawHeldTool(toolKey, angle, 1 - bounce);
+      drawHeldTool(toolKey, heldAngle, 1 - bounce);
     }
 
     // 联机模式下给本机角色头顶也绘制名字气泡（房主能看见自己的名字）

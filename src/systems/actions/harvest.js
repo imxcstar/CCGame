@@ -49,6 +49,11 @@
       .map(([key, value]) => '+' + value + ' ' + RESOURCE_NAMES[key])
       .join(' ');
 
+    // 角色头顶弹出"+N 木材"等漂浮文字，跟随玩家上升渐隐。
+    if (text && player.transform && game.state?.playerId != null) {
+      game.spawnFloaterAboveEntity?.(game.state.playerId, text);
+    }
+
     showMessage(text || '采集完成');
   }
 

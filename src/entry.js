@@ -68,6 +68,7 @@ import './net/lobby.js';
 import './ui/multiplayer.js';
 import './ui.js';
 import './render/effects.js';
+import './render/floaters.js';
 import './render/drawables.js';
 import './render/scene.js';
 import './render.js';

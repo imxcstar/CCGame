@@ -19,6 +19,7 @@
     drawFishingCast,
     drawSelectedWorldTargetHighlight,
     drawParticles,
+    drawFloaters,
     drawBuildGhost,
     drawAtmosphere,
     drawLighting
@@ -93,6 +94,7 @@
     drawFishingCast(shakeX, shakeY);
     drawBuildGhost(shakeX, shakeY);
     drawParticles(shakeX, shakeY);
+    drawFloaters?.(shakeX, shakeY);
     drawAtmosphere();
     drawLighting();
 
