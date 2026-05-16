@@ -738,7 +738,7 @@
 
     player.player.attackCooldown = 0.26;
     burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
-    state.shake = Math.max(state.shake, 4);
+    // 不再触发画面抖动：攻击/砍树用手部小幅抖动表现，避免与被攻击的画面抖动重叠。
 
     // 联机 client：转发给 host，由 host 进行权威伤害结算与战利品分发。
     if (isClientMode() && typeof game.netClientRequestAttack === 'function') {
@@ -772,7 +772,7 @@
 
     player.player.attackCooldown = 0.26;
     burst(player.transform.x, player.transform.y, 'rgba(230,245,255,0.8)', 3, 30);
-    state.shake = Math.max(state.shake, 4);
+    // 不再触发画面抖动：攻击/砍树用手部小幅抖动表现，避免与被攻击的画面抖动重叠。
 
     // 联机 client：转发给 host，由 host 进行权威伤害结算。
     if (isClientMode() && typeof game.netClientRequestAttack === 'function') {
@@ -986,7 +986,7 @@
     if (!target) return true;
 
     const damage = target.group === 'enemy' ? getEnemyDamage(toolKey, target.id) : getResourceDamage(toolKey, target.id);
-    state.shake = Math.max(state.shake, 4);
+    // 不再触发画面抖动：攻击/砍树用手部小幅抖动表现，避免与被攻击的画面抖动重叠。
 
     if (target.group === 'resource') {
       const health = getComponent(target.id, 'health');

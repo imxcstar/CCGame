@@ -31,6 +31,7 @@
     state.hint = '';
     state.score = 0;
     state.shake = 0;
+    if (Array.isArray(state.floaters)) state.floaters.length = 0;
     state.lastTimestamp = 0;
     // 远端玩家 ghost 由网络模块维护；新开局先清空，避免残留旧房间的影子。
     if (state.players && typeof state.players.clear === 'function') {
@@ -110,6 +111,7 @@
 
     // 粒子是纯视觉，所有模式都跑
     game.updateParticleSystem?.(dt);
+    game.updateFloaterSystem?.(dt);
     game.updateHintSystem?.();
     setScore();
 

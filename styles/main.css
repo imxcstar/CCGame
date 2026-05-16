@@ -1225,20 +1225,23 @@ body.touch-mode .mobile-controls {
     pointer-events: auto;
   }
 
-  /* 移动端：状态 HUD 放到屏幕左上角（紧凑型），把按钮腾给右上 */
+  /* 移动端：状态 HUD 放到屏幕左上角（紧凑型），把按钮腾给右上。
+     不再使用容器背景 / 模糊，让数值条裸露在画面上更轻量。 */
   .panel-status {
     position: fixed;
     top: 10px;
     left: 10px;
     right: auto;
     /* 留出右侧约 78px 给 panel-toggles（按钮宽 48 + 边距） */
-    width: min(280px, calc(100vw - 88px));
+    width: min(220px, calc(100vw - 88px));
     max-height: none;
-    padding: 6px 10px;
-    border-radius: 16px;
-    background: rgba(247, 243, 223, 0.86);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     pointer-events: none;
     opacity: 1;
     z-index: 8;
@@ -1249,6 +1252,7 @@ body.touch-mode .mobile-controls {
     gap: 6px;
     background: transparent;
     border: none;
+    box-shadow: none;
   }
 
   /* 状态 HUD 内：隐藏非必要文本，只保留 4 条紧凑生命条 */
@@ -1260,9 +1264,10 @@ body.touch-mode .mobile-controls {
     display: none;
   }
 
+  /* 数值条改为单列纵向排列 */
   .panel-status .bars {
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .panel-status .bar {
