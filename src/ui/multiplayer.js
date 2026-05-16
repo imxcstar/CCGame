@@ -462,10 +462,21 @@
 
   // ---- 自定义中转服务器设置 ----
 
+  function getStrategyFromForm() {
+    if (dom.mpStrategyWsFullrelay?.checked) return 'ws-fullrelay';
+    if (dom.mpStrategyWsRelay?.checked) return 'ws-relay';
+    return 'torrent';
+  }
+
+  function applyStrategyToForm(strategy) {
+    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = strategy === 'torrent';
+    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = strategy === 'ws-relay';
+    if (dom.mpStrategyWsFullrelay) dom.mpStrategyWsFullrelay.checked = strategy === 'ws-fullrelay';
+  }
+
   function openServerSettings() {
     const cfg = game.netServerConfig?.getServerConfig?.() || { strategy: 'torrent', relayUrls: [] };
-    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = cfg.strategy !== 'ws-relay';
-    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = cfg.strategy === 'ws-relay';
+    applyStrategyToForm(cfg.strategy);
     if (dom.mpRelayUrlsInput) dom.mpRelayUrlsInput.value = (cfg.relayUrls || []).join('\n');
     if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '';
     syncServerSettingsFieldVisibility();
@@ -477,8 +488,14 @@
   }
 
   function syncServerSettingsFieldVisibility() {
-    const useRelay = !!dom.mpStrategyWsRelay?.checked;
-    if (dom.mpRelayUrlsField) dom.mpRelayUrlsField.hidden = !useRelay;
+    const strategy = getStrategyFromForm();
+    const showUrls = strategy === 'ws-relay' || strategy === 'ws-fullrelay';
+    if (dom.mpRelayUrlsField) dom.mpRelayUrlsField.hidden = !showUrls;
+    if (dom.mpRelayUrlsFieldLabel) {
+      dom.mpRelayUrlsFieldLabel.textContent = strategy === 'ws-fullrelay'
+        ? '完整中转服务器地址（每行一条，支持 wss:// 或 ws://；多条可做故障转移）'
+        : '中转服务器地址（每行一条，支持 wss:// 或 ws://）';
+    }
   }
 
   function parseRelayUrls(text) {
@@ -490,9 +507,10 @@
 
   function handleSaveServerSettings() {
     if (!game.netServerConfig) return;
-    const useRelay = !!dom.mpStrategyWsRelay?.checked;
+    const strategy = getStrategyFromForm();
+    const needsUrls = strategy === 'ws-relay' || strategy === 'ws-fullrelay';
     const urls = parseRelayUrls(dom.mpRelayUrlsInput?.value || '');
-    if (useRelay) {
+    if (needsUrls) {
       if (urls.length === 0) {
         if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '请填写至少一个 wss:// 或 ws:// 地址。';
         return;
@@ -504,8 +522,8 @@
       }
     }
     game.netServerConfig.setServerConfig({
-      strategy: useRelay ? 'ws-relay' : 'torrent',
-      relayUrls: useRelay ? urls : []
+      strategy,
+      relayUrls: needsUrls ? urls : []
     });
     closeServerSettings();
     setError('已应用新的中转服务器设置。如已在房间中，连接已断开，请重新创建 / 加入房间。');
@@ -515,8 +533,7 @@
     if (!game.netServerConfig) return;
     game.netServerConfig.resetServerConfig();
     const cfg = game.netServerConfig.getServerConfig();
-    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = cfg.strategy !== 'ws-relay';
-    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = cfg.strategy === 'ws-relay';
+    applyStrategyToForm(cfg.strategy);
     if (dom.mpRelayUrlsInput) dom.mpRelayUrlsInput.value = (cfg.relayUrls || []).join('\n');
     syncServerSettingsFieldVisibility();
     if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '';
@@ -542,6 +559,7 @@
     });
     dom.mpStrategyTorrent?.addEventListener('change', syncServerSettingsFieldVisibility);
     dom.mpStrategyWsRelay?.addEventListener('change', syncServerSettingsFieldVisibility);
+    dom.mpStrategyWsFullrelay?.addEventListener('change', syncServerSettingsFieldVisibility);
     // 点遮罩区域关闭
     dom.mpServerSettingsOverlay.addEventListener('click', (event) => {
       if (event.target === dom.mpServerSettingsOverlay) closeServerSettings();
