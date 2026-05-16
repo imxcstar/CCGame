@@ -55,11 +55,11 @@
     </div>
 
     <div class="hud-col hud-col-right">
-      <div class="panel panel-inventory" id="inventoryPanel">
+      <div class="panel panel-inventory panel-hidden" id="inventoryPanel">
         <div class="section-title">背包</div>
         <div class="inventory" id="inventory"></div>
       </div>
-      <div class="panel panel-craft" id="craftPanel">
+      <div class="panel panel-craft panel-hidden" id="craftPanel">
         <div class="section-title">制作</div>
         <div class="craft-list" id="craftList"></div>
       </div>
@@ -107,12 +107,43 @@
       </div>
 
       <div class="mp-section mp-actions" id="mpLobbyActions">
+        <div class="mp-host-config">
+          <label class="mp-field">
+            <span>房间名称</span>
+            <input type="text" id="mpRoomNameInput" maxlength="40" placeholder="（可选）输入房间名称">
+          </label>
+          <div class="mp-host-row">
+            <label class="mp-field mp-field-inline">
+              <span>最多玩家</span>
+              <input type="number" id="mpMaxPlayersInput" min="2" max="16" step="1" value="8">
+            </label>
+            <label class="mp-field mp-field-inline">
+              <span>房间密码</span>
+              <input type="text" id="mpPasswordInput" maxlength="32" placeholder="（可选）" autocomplete="off">
+            </label>
+          </div>
+          <label class="mp-checkbox">
+            <input type="checkbox" id="mpPublicInput">
+            <span>公开房间（在大厅展示，其他玩家可直接加入）</span>
+          </label>
+        </div>
         <button type="button" class="primary" id="mpHostBtn">创建房间</button>
         <div class="mp-join-row">
           <input type="text" id="mpJoinCodeInput" maxlength="12" placeholder="输入房间码" autocomplete="off" spellcheck="false">
+          <input type="text" id="mpJoinPasswordInput" maxlength="32" placeholder="密码（可选）" autocomplete="off">
           <button type="button" id="mpJoinBtn">加入房间</button>
         </div>
         <div class="mp-error" id="mpError"></div>
+
+        <div class="mp-lobby">
+          <div class="mp-lobby-head">
+            <span class="section-title">房间大厅</span>
+            <button type="button" id="mpLobbyToggleBtn" class="mp-mini-btn">刷新大厅</button>
+          </div>
+          <ul id="mpLobbyList" class="mp-lobby-list">
+            <li class="mp-lobby-empty">点击"刷新大厅"以浏览公开房间</li>
+          </ul>
+        </div>
       </div>
 
       <div class="mp-section mp-room" id="mpRoomSection" hidden>

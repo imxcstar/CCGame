@@ -64,6 +64,7 @@ import './net/transport.js';
 import './net/host.js';
 import './net/client.js';
 import './net/session.js';
+import './net/lobby.js';
 import './ui/multiplayer.js';
 import './ui.js';
 import './render/effects.js';

@@ -158,6 +158,69 @@ body {
   min-height: 0;
 }
 
+/* ---- 桌面默认布局：把生命等数值条放到屏幕上方，
+   状态卡片不再放在左侧列里，而是固定到顶部居中。
+   减少左侧宽度占用，并让画面更紧凑。 ---- */
+.panel-status {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 320px));
+  max-height: none;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: rgba(247, 243, 223, 0.86);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 6;
+}
+
+.panel-status .status-card {
+  padding: 0;
+  gap: 4px;
+  background: transparent;
+  border: none;
+}
+
+/* 桌面端：4 条生命数值横向排列，节约垂直高度 */
+.panel-status .bars {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 12px;
+}
+
+.panel-status .bar {
+  grid-template-columns: 28px 1fr 26px;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.panel-status .bar-track {
+  height: 8px;
+  border-width: 1.5px;
+}
+
+/* 桌面端：状态卡里大量辅助文字（操作说明 / 评分等）默认隐藏，避免占高度。
+   重要的提示（message / hint）保留显示。 */
+.panel-status .status-row,
+.panel-status .controls,
+.panel-status .brand {
+  display: none;
+}
+
+.panel-status .message,
+.panel-status .hint {
+  text-align: center;
+  font-size: 12px;
+  margin: 0;
+}
+
+.panel-status .message:empty,
+.panel-status .hint:empty {
+  display: none;
+}
+
 .panel-inventory {
   flex: 0 0 auto;
 }
@@ -707,6 +770,12 @@ body.touch-mode .controls-mobile {
   display: none;
 }
 
+/* 移动端显式打开（show-mobile）的面板要无视 panel-hidden 默认隐藏，
+   这样桌面默认隐藏的背包/制作面板在手机上仍可由顶部按钮切换显示。 */
+.panel.panel-hidden.show-mobile {
+  display: flex;
+}
+
 /* ============================================================
  * 世界目标交互面板（底部居中）
  * ============================================================ */
@@ -1053,8 +1122,9 @@ body.touch-mode .mobile-controls {
 .panel-toggles {
   position: absolute;
   top: 14px;
-  left: 14px;
+  right: 14px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
   pointer-events: auto;
 }
@@ -1124,18 +1194,19 @@ body.touch-mode .mobile-controls {
     display: contents;
   }
 
-  /* 三个可切换面板：默认隐藏，由 .show-mobile 显示 */
+  /* 三个可切换面板：默认隐藏，由 .show-mobile 显示。
+     状态 HUD 在左上、按钮列在右上，因此把面板锚定到左侧、
+     在状态 HUD 下方，整体占用空间最小。 */
   .panel-minimap,
   .panel-inventory,
   .panel-craft {
     position: absolute;
-    width: min(360px, calc(100vw - 24px));
-    /* 顶部 72px 给切换按钮与状态 HUD；
-       底部约 168px 给摇杆 / 动作按钮 */
-    max-height: calc(100dvh - 240px);
-    top: 72px;
+    width: min(360px, calc(100vw - 80px));
+    /* 顶部留 100px 给状态 HUD；底部约 168px 给摇杆 / 动作按钮 */
+    max-height: calc(100dvh - 280px);
+    top: 100px;
     left: 12px;
-    right: 12px;
+    right: auto;
     transform: translateY(-12px);
     opacity: 0;
     pointer-events: none;
@@ -1146,15 +1217,6 @@ body.touch-mode .mobile-controls {
     z-index: 10;
   }
 
-  .panel-minimap {
-    right: auto;
-  }
-
-  .panel-inventory,
-  .panel-craft {
-    left: auto;
-  }
-
   .panel-minimap.show-mobile,
   .panel-inventory.show-mobile,
   .panel-craft.show-mobile {
@@ -1163,19 +1225,17 @@ body.touch-mode .mobile-controls {
     pointer-events: auto;
   }
 
-  /* 始终可见的紧凑状态 HUD（生命/饥饿/口渴/体力）
-     2×2 网格、半透明、不拦截触摸，避免遮挡场景；
-     置于顶部右侧，与左侧切换按钮分置避免重叠 */
+  /* 移动端：状态 HUD 放到屏幕左上角（紧凑型），把按钮腾给右上 */
   .panel-status {
     position: fixed;
-    top: 14px;
-    right: 14px;
-    left: auto;
-    /* 100vw - 200px：左侧约 14+160px 留给切换按钮与间距，避免重叠 */
-    width: min(360px, calc(100vw - 200px));
+    top: 10px;
+    left: 10px;
+    right: auto;
+    /* 留出右侧约 78px 给 panel-toggles（按钮宽 48 + 边距） */
+    width: min(280px, calc(100vw - 88px));
     max-height: none;
-    padding: 8px 12px;
-    border-radius: 18px;
+    padding: 6px 10px;
+    border-radius: 16px;
     background: rgba(247, 243, 223, 0.86);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -1259,29 +1319,17 @@ body.touch-mode .mobile-controls {
   .panel-toggles {
     gap: 6px;
     top: 10px;
-    left: 10px;
-  }
-
-  /* 状态 HUD：放到切换按钮下方一行，避免横向太挤 */
-  .panel-status {
-    top: 62px;
     right: 10px;
+    left: auto;
+  }
+
+  /* 状态 HUD：左上紧凑显示，留出右侧给纵向按钮列 */
+  .panel-status {
+    top: 10px;
     left: 10px;
-    width: auto;
-    max-width: none;
-  }
-
-  /* 可切换面板的起始高度也下移，避免与状态 HUD 重叠 */
-  .panel-minimap,
-  .panel-inventory,
-  .panel-craft {
-    top: 142px;
-    /* 顶部 142px（切换按钮 + 状态 HUD）+ 底部约 168px 控件区域 */
-    max-height: calc(100dvh - 310px);
-  }
-
-  .world-target-panel {
-    top: 142px;
+    right: auto;
+    /* 留出右侧按钮列宽 42 + 16 ≈ 58px */
+    width: min(280px, calc(100vw - 68px));
   }
 
   .joystick {
@@ -1387,6 +1435,131 @@ body.touch-mode .mobile-controls {
   color: var(--error-color-active);
   font-weight: 600;
   font-size: 13px;
+}
+
+/* ---- 房间创建配置 ---- */
+.mp-host-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1.5px dashed var(--border-color-light);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.mp-host-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mp-field-inline {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.mp-field-inline span {
+  font-size: 12px;
+}
+
+.mp-field-inline input {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.mp-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-color-body);
+  user-select: none;
+  cursor: pointer;
+}
+
+.mp-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary-color);
+}
+
+/* ---- 房间大厅列表 ---- */
+.mp-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color-light);
+}
+
+.mp-lobby-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.mp-lobby-empty {
+  padding: 14px 12px;
+  text-align: center;
+  color: var(--text-color-secondary);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+.mp-lobby-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1.5px solid var(--border-color-light);
+  border-radius: 12px;
+}
+
+.mp-lobby-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mp-lobby-title {
+  font-weight: 700;
+  color: var(--text-color);
+  font-size: 14px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-lobby-meta {
+  font-size: 12px;
+  color: var(--text-color-secondary);
+}
+
+.mp-lobby-lock {
+  font-size: 12px;
 }
 
 .mp-room-header {
