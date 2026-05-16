@@ -13,7 +13,10 @@
   }
 
   const STORAGE_KEY = 'ccgame.mp.name';
+  const STORAGE_ROOM_NAME_KEY = 'ccgame.mp.roomName';
   let latencyTimer = 0;
+  let lobbyBrowsing = false;
+  let unsubscribeLobby = null;
 
   function loadStoredName() {
     try {
@@ -37,6 +40,9 @@
     if (!dom.mpNameInput.value) {
       dom.mpNameInput.value = loadStoredName();
     }
+    if (dom.mpRoomNameInput && !dom.mpRoomNameInput.value) {
+      try { dom.mpRoomNameInput.value = localStorage.getItem(STORAGE_ROOM_NAME_KEY) || ''; } catch { /* ignore */ }
+    }
     refreshView();
     setTimeout(() => {
       if (netSession.state.status === 'connected') {
@@ -49,6 +55,7 @@
 
   function closeOverlay() {
     dom.multiplayerOverlay.classList.remove('show');
+    if (lobbyBrowsing) stopLobbyBrowse();
   }
 
   function setError(message) {
@@ -216,27 +223,133 @@
     setError('');
     const name = getInputName();
     persistName(name);
+    const roomName = (dom.mpRoomNameInput?.value || '').trim().slice(0, 40);
+    try { localStorage.setItem(STORAGE_ROOM_NAME_KEY, roomName); } catch { /* ignore */ }
+    const maxPlayers = Math.max(2, Math.min(16, Number(dom.mpMaxPlayersInput?.value || 8) | 0));
+    const password = (dom.mpPasswordInput?.value || '').trim();
+    const isPublic = !!dom.mpPublicInput?.checked;
     try {
-      await netSession.hostRoom({ name });
+      await netSession.hostRoom({ name, roomName, maxPlayers, password, isPublic });
     } catch (err) {
       setError('创建房间失败：' + (err?.message || err));
     }
   }
 
-  async function handleJoin() {
+  async function handleJoin(prefillCode, prefillPassword) {
     setError('');
     const name = getInputName();
     persistName(name);
-    const code = dom.mpJoinCodeInput.value;
+    const code = (prefillCode != null ? prefillCode : dom.mpJoinCodeInput.value) || '';
+    const password = prefillPassword != null ? prefillPassword : (dom.mpJoinPasswordInput?.value || '');
     if (!code.trim()) {
       setError('请输入房间码');
       return;
     }
     try {
-      await netSession.joinRoom({ code, name });
+      await netSession.joinRoom({ code, name, password });
     } catch (err) {
       setError('加入房间失败：' + (err?.message || err));
     }
+  }
+
+  function renderLobbyList(rooms) {
+    const list = dom.mpLobbyList;
+    if (!list) return;
+    list.innerHTML = '';
+    if (!lobbyBrowsing) {
+      const li = document.createElement('li');
+      li.className = 'mp-lobby-empty';
+      li.textContent = '点击"刷新大厅"以浏览公开房间';
+      list.appendChild(li);
+      return;
+    }
+    if (!rooms || rooms.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'mp-lobby-empty';
+      li.textContent = '正在监听大厅广播…（暂无公开房间）';
+      list.appendChild(li);
+      return;
+    }
+    rooms.forEach((room) => {
+      const li = document.createElement('li');
+      li.className = 'mp-lobby-item';
+
+      const info = document.createElement('div');
+      info.className = 'mp-lobby-info';
+      const title = document.createElement('div');
+      title.className = 'mp-lobby-title';
+      title.textContent = room.name || `${room.code} 的房间`;
+      if (room.hasPassword) {
+        const lock = document.createElement('span');
+        lock.className = 'mp-lobby-lock';
+        lock.textContent = '🔒';
+        lock.title = '需要密码';
+        title.appendChild(lock);
+      }
+      info.appendChild(title);
+
+      const meta = document.createElement('div');
+      meta.className = 'mp-lobby-meta subtle';
+      meta.textContent = `房主：${room.host || '匿名'} · ${room.peerCount}/${room.maxPlayers} · 房间码 ${room.code}`;
+      info.appendChild(meta);
+
+      li.appendChild(info);
+
+      const joinBtn = document.createElement('button');
+      joinBtn.type = 'button';
+      joinBtn.className = 'mp-mini-btn';
+      joinBtn.textContent = '加入';
+      joinBtn.disabled = room.peerCount >= room.maxPlayers;
+      if (joinBtn.disabled) joinBtn.title = '房间已满';
+      joinBtn.addEventListener('click', () => {
+        game.playSound?.('click');
+        let password = '';
+        if (room.hasPassword) {
+          password = window.prompt(`房间「${room.name}」需要密码：`, '') || '';
+          if (!password) return;
+        }
+        dom.mpJoinCodeInput.value = room.code;
+        if (dom.mpJoinPasswordInput) dom.mpJoinPasswordInput.value = password;
+        handleJoin(room.code, password);
+      });
+      li.appendChild(joinBtn);
+
+      list.appendChild(li);
+    });
+  }
+
+  async function startLobbyBrowse() {
+    if (!game.netLobby) return;
+    lobbyBrowsing = true;
+    if (dom.mpLobbyToggleBtn) dom.mpLobbyToggleBtn.textContent = '停止浏览';
+    renderLobbyList([]);
+    try {
+      await game.netLobby.startBrowse();
+      if (unsubscribeLobby) unsubscribeLobby();
+      unsubscribeLobby = game.netLobby.on((rooms) => {
+        if (lobbyBrowsing) renderLobbyList(rooms);
+      });
+      renderLobbyList(game.netLobby.getRooms());
+    } catch (err) {
+      console.warn('[mp ui] lobby browse error', err);
+      setError('大厅连接失败：' + (err?.message || err));
+      lobbyBrowsing = false;
+      if (dom.mpLobbyToggleBtn) dom.mpLobbyToggleBtn.textContent = '刷新大厅';
+      renderLobbyList([]);
+    }
+  }
+
+  function stopLobbyBrowse() {
+    lobbyBrowsing = false;
+    if (unsubscribeLobby) { unsubscribeLobby(); unsubscribeLobby = null; }
+    try { game.netLobby?.stopBrowse?.(); } catch (err) { console.warn('[mp ui] lobby stop error', err); }
+    if (dom.mpLobbyToggleBtn) dom.mpLobbyToggleBtn.textContent = '刷新大厅';
+    renderLobbyList([]);
+  }
+
+  function toggleLobbyBrowse() {
+    if (lobbyBrowsing) stopLobbyBrowse();
+    else startLobbyBrowse();
   }
 
   async function handleLeave() {
@@ -311,6 +424,12 @@
       game.playSound?.('click');
       handleJoin();
     });
+    if (dom.mpLobbyToggleBtn) {
+      dom.mpLobbyToggleBtn.addEventListener('click', () => {
+        game.playSound?.('click');
+        toggleLobbyBrowse();
+      });
+    }
     dom.mpJoinCodeInput.addEventListener('input', (event) => {
       const upper = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (event.target.value !== upper) {

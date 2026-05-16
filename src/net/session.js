@@ -40,7 +40,14 @@
     peers: new Map(),
     chatHistory: [],
     status: 'idle',                // 'idle' | 'connecting' | 'connected' | 'error'
-    error: ''
+    error: '',
+    // 房间元数据（仅由房主在 hostRoom 时设置；客户端通过 HELLO 接收只读副本）
+    roomInfo: {
+      name: '',
+      isPublic: false,
+      maxPlayers: 8,
+      hasPassword: false
+    }
   };
 
   const listeners = new Map(); // event -> Set<fn>
@@ -111,6 +118,12 @@
     session.chatHistory.length = 0;
     session.status = 'idle';
     session.error = '';
+    session.roomInfo = {
+      name: '',
+      isPublic: false,
+      maxPlayers: 8,
+      hasPassword: false
+    };
   }
 
   function registerLocalPeer() {
@@ -186,6 +199,17 @@
   }
 
   netTransport.onPeerJoin((peerId) => {
+    // 房主：超员则立刻踢出新加入者
+    if (session.role === NET_ROLES.HOST && session.roomInfo?.maxPlayers > 0) {
+      if (session.peers.size >= session.roomInfo.maxPlayers) {
+        try {
+          netTransport.send(NET_CHANNELS.KICK, game.netMakeKick?.({ reason: '房间人数已达上限' }) || { r: '房间人数已达上限', ts: Date.now() }, peerId);
+        } catch (err) {
+          console.warn('[net session] full-room kick error', err);
+        }
+        return;
+      }
+    }
     const peer = {
       id: peerId,
       name: `玩家-${peerId.slice(0, 4)}`,
@@ -205,6 +229,10 @@
       ts: Date.now()
     });
     emit('change', session);
+    // 房主更新大厅广播中的当前人数
+    if (session.role === NET_ROLES.HOST && session.roomInfo?.isPublic) {
+      try { game.netLobby?.updateAnnounce?.({ peerCount: session.peers.size }); } catch (err) { console.warn('[net session] lobby update error', err); }
+    }
   });
 
   netTransport.onPeerLeave((peerId) => {
@@ -219,6 +247,10 @@
     const wasHost = !!peer?.isHost;
     session.peers.delete(peerId);
     emit('change', session);
+    // 房主更新大厅广播中的当前人数
+    if (session.role === NET_ROLES.HOST && session.roomInfo?.isPublic) {
+      try { game.netLobby?.updateAnnounce?.({ peerCount: session.peers.size }); } catch (err) { console.warn('[net session] lobby update error', err); }
+    }
     // 房主迁移：若刚刚离开的是房主、且本地仍在房间里且角色是 client，启动
     // 确定性选举来决定新 host。规则：剩余在线 peerId（含自己 selfId）字典序
     // 升序排序后取最小者；这样所有 peer 同时计算出同一个新房主。
@@ -233,7 +265,7 @@
 
   bindChannels();
 
-  async function hostRoom({ name } = {}) {
+  async function hostRoom({ name, roomName, isPublic = false, maxPlayers = 8, password = '' } = {}) {
     if (session.status === 'connecting' || session.status === 'connected') {
       throw new Error('已在房间中');
     }
@@ -243,14 +275,36 @@
     const code = generateRoomCode();
     session.roomCode = code;
     session.localColor = pickColor('host-' + code);
+    const trimmedPassword = String(password || '').trim().slice(0, 32);
+    session.roomInfo = {
+      name: String(roomName || '').trim().slice(0, 40) || `${session.localName} 的房间`,
+      isPublic: !!isPublic,
+      maxPlayers: Math.max(2, Math.min(16, (maxPlayers | 0) || 8)),
+      hasPassword: !!trimmedPassword
+    };
     setStatus('connecting');
     try {
-      await netTransport.join(code);
+      await netTransport.join(code, trimmedPassword ? { password: trimmedPassword } : undefined);
       registerLocalPeer();
       setStatus('connected');
       // 启动 host 同步循环（broadcast SNAPSHOT、接收 INPUT）
       game.netHostStart?.();
       pushChat({ system: true, text: `房间已创建：${code}（分享给好友以加入）`, ts: Date.now() });
+      // 若房间公开，则向大厅广播房间信息
+      if (session.roomInfo.isPublic && game.netLobby) {
+        try {
+          game.netLobby.startAnnounce({
+            code,
+            name: session.roomInfo.name,
+            host: session.localName,
+            maxPlayers: session.roomInfo.maxPlayers,
+            peerCount: session.peers.size,
+            hasPassword: session.roomInfo.hasPassword
+          });
+        } catch (err) {
+          console.warn('[net session] lobby announce error', err);
+        }
+      }
       return code;
     } catch (err) {
       setStatus('error', err?.message || String(err));
@@ -258,7 +312,7 @@
     }
   }
 
-  async function joinRoom({ code, name } = {}) {
+  async function joinRoom({ code, name, password = '' } = {}) {
     if (session.status === 'connecting' || session.status === 'connected') {
       throw new Error('已在房间中');
     }
@@ -271,9 +325,10 @@
     session.localName = String(name || '').trim().slice(0, 32) || '玩家';
     session.roomCode = sanitized;
     session.localColor = pickColor('client-' + sanitized + '-' + Math.random());
+    const trimmedPassword = String(password || '').trim().slice(0, 32);
     setStatus('connecting');
     try {
-      await netTransport.join(sanitized);
+      await netTransport.join(sanitized, trimmedPassword ? { password: trimmedPassword } : undefined);
       registerLocalPeer();
       setStatus('connected');
       // 启动 client：等 HELLO 中的 seed 到达后 bootstrap 世界
@@ -291,6 +346,8 @@
     // 先停掉 host/client 同步，再断开 transport，避免在 leave 过程中还在广播
     game.netHostStop?.();
     game.netClientStop?.();
+    // 停止大厅宣告
+    try { game.netLobby?.stopAnnounce?.(); } catch (err) { console.warn('[net session] lobby stop error', err); }
     await netTransport.leave();
     pushChat({ system: true, text: '你已离开房间', ts: Date.now() });
     resetState();
@@ -365,6 +422,8 @@
     if (!ok) return false;
     // 自己停掉 host 循环并切到 client。新房主在收到 HOST_TRANSFER 后会自己 startHost。
     game.netHostStop?.();
+    // 不再担任房主：从大厅撤销公开广播
+    try { game.netLobby?.stopAnnounce?.(); } catch (err) { console.warn('[net session] lobby stop error', err); }
     session.role = NET_ROLES.CLIENT;
     const selfId = netTransport.getSelfId();
     const localPeer = selfId ? session.peers.get(selfId) : null;

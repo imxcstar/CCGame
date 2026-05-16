@@ -1,5 +1,14 @@
 (function (game) {
-  const { tileWalkable, tileAtWorld, dist, getStructureIds, getComponent, getStructureConfig } = game;
+  const {
+    tileWalkable,
+    tileAtWorld,
+    dist,
+    getStructureIds,
+    getResourceIds,
+    getComponent,
+    getStructureConfig,
+    getEntityConfig
+  } = game;
 
   function isBlocked(x, y, radius, actorId = null) {
     const samples = [
@@ -23,6 +32,26 @@
       if (structure.kind === 'floor') continue;
 
       const collisionRadius = getStructureConfig(structure.kind)?.collisionRadius ?? collider.radius;
+      if (collisionRadius > 0 && dist(x, y, transform.x, transform.y) < radius + collisionRadius) return true;
+    }
+
+    // 资源节点（树木、石头、椰子树、灌木）作为障碍物阻挡移动；
+    // 只在 alive 时阻挡，被采集后/重生前可通过。
+    for (const entityId of getResourceIds()) {
+      if (actorId === entityId) continue;
+      const transform = getComponent(entityId, 'transform');
+      const collider = getComponent(entityId, 'collider');
+      const resourceNode = getComponent(entityId, 'resourceNode');
+      if (!transform || !collider || !resourceNode?.alive) continue;
+
+      // 优先用配置中的 collisionRadius（可在 entity 配置中独立调节），否则
+      // 按 collider 半径的 70% 作为阻挡半径，比命中判定略小，给玩家留出
+      // 走位的余地，避免被卡住。
+      const config = getEntityConfig?.(resourceNode.kind);
+      const collisionRadius =
+        config?.collisionRadius != null
+          ? config.collisionRadius
+          : Math.max(6, collider.radius * 0.7);
       if (collisionRadius > 0 && dist(x, y, transform.x, transform.y) < radius + collisionRadius) return true;
     }
 

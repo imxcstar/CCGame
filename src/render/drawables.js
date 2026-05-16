@@ -194,18 +194,19 @@
 
   function drawPlayerNameLabel(name, color, bounce) {
     if (!name) return;
-    ctx.font = '11px "Microsoft YaHei", Arial, sans-serif';
+    ctx.font = '600 11px "Microsoft YaHei", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const labelWidth = ctx.measureText(name).width + 10;
-    const labelX = -labelWidth / 2;
-    const labelY = -28 - bounce;
-    ctx.fillStyle = 'rgba(8, 20, 30, 0.72)';
-    ctx.fillRect(labelX, labelY - 8, labelWidth, 14);
-    ctx.fillStyle = color || '#e6f6ff';
-    ctx.fillRect(labelX, labelY - 8, 3, 14);
-    ctx.fillStyle = '#f1f7ff';
-    ctx.fillText(name, 0, labelY - 1);
+    // 名字显示在角色脚下，避免与头顶手持物 / 工具图标重叠；不绘制背景框，
+    // 仅使用文字描边保证在任何地形上都可读。`bounce` 让名字随脚步轻微抖动，
+    // 与角色脚部保持一致的视觉关联。
+    const labelY = 26 + bounce * 0.4;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(8, 20, 30, 0.78)';
+    ctx.strokeText(name, 0, labelY);
+    ctx.fillStyle = color || '#f1f7ff';
+    ctx.fillText(name, 0, labelY);
   }
 
   function getLocalPlayerLabel() {
