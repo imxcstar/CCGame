@@ -31,10 +31,22 @@
   function generateSelfId() {
     try {
       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+        // 32 个 hex 字符 ≈ 128 bit 熵；房间内只需保证唯一即可
+        return crypto.randomUUID().replace(/-/g, '');
+      }
+      if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        const buf = new Uint8Array(16);
+        crypto.getRandomValues(buf);
+        let hex = '';
+        for (let i = 0; i < buf.length; i += 1) {
+          hex += buf[i].toString(16).padStart(2, '0');
+        }
+        return hex;
       }
     } catch { /* noop */ }
-    return 'p-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    // 极端兜底：仅在 crypto API 完全不可用时使用；该 ID 不参与任何鉴权 /
+    // 密钥派生，唯一用途是在一个房间内做 peer 寻址，因此可以接受较弱的熵。
+    return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
   }
 
   // 模块级 selfId：与 trystero 行为对齐——一个浏览器 tab 在整个生命周期内
@@ -241,8 +253,11 @@
       });
       sock.addEventListener('close', () => {
         if (ws === sock) ws = null;
-        // 把所有在线 peer 视为掉线，让上层逻辑能立刻响应
-        // 但不要清掉 selfId / channels —— 重连后还要继续用
+        // 把所有在线 peer 视为掉线：触发 peer-leave，让上层 session 立刻
+        // 把他们从成员列表清掉；重连成功后服务器 welcome 会重新发 peers 列表。
+        const lostIds = Array.from(peers.keys());
+        peers.clear();
+        lostIds.forEach((id) => emitPeerLeave(id));
         if (!closed) scheduleReconnect();
       });
       sock.addEventListener('error', () => {

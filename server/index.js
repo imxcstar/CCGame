@@ -146,10 +146,10 @@ function handleHello(conn, msg) {
     return;
   }
   const password = typeof msg.password === 'string' ? msg.password.slice(0, 128) : '';
-  // 客户端自带 self（与 Trystero 行为对齐）；只接受合法 ID，缺失或冲突时由
-  // 服务端兜底分配，避免 peerId 重复造成消息错路。
+  // 客户端自带 self（与 Trystero 行为对齐）；只接受合法 ID（hex / 字母数字），
+  // 缺失或冲突时由服务端兜底分配，避免 peerId 重复造成消息错路。
   let peerId = '';
-  if (typeof msg.self === 'string' && /^[A-Za-z0-9_-]{4,64}$/.test(msg.self)) {
+  if (typeof msg.self === 'string' && /^[A-Za-z0-9]{4,64}$/.test(msg.self)) {
     peerId = msg.self;
   }
   const res = getOrCreateRoom(appId, roomId, password);
@@ -159,7 +159,8 @@ function handleHello(conn, msg) {
   }
   const room = res.room;
   if (!peerId || room.peers.has(peerId)) {
-    peerId = randomUUID().replace(/-/g, '').slice(0, 20);
+    // 兜底：服务端生成 32 hex 字符（≈128 bit 熵），保证整服唯一
+    peerId = randomUUID().replace(/-/g, '');
   }
   conn.peerId = peerId;
   conn.room = room;
