@@ -101,7 +101,7 @@
     if (activeStrategy && activeStrategy.strategy === target) {
       return activeStrategy;
     }
-    if (activeJoinPromise && activeStrategy?.strategy === target) {
+    if (activeJoinPromise) {
       return activeJoinPromise;
     }
     activeJoinPromise = (async () => {
