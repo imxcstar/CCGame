@@ -34,7 +34,7 @@
   function spawnFloaterAboveEntity(entityId, text, options = {}) {
     const transform = getComponent(entityId, 'transform');
     if (!transform) return;
-    spawnFloater(transform.x, transform.y, text, { ...options, attachId: entityId });
+    spawnFloater(transform.x, transform.y, text, options);
     const floater = state.floaters[state.floaters.length - 1];
     if (floater) floater.attachId = entityId;
   }
