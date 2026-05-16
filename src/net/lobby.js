@@ -64,8 +64,12 @@
 
   async function ensureJoin() {
     if (lobbyRoom) return lobbyRoom;
-    if (!joinRoomFn) {
-      // 并发调用 ensureJoin 时复用同一个 import promise，避免重复加载 trystero
+    // 通过 server-config 加载激活策略；用户切换到 ws-relay 后大厅也走自定义中转。
+    const cfgModule = game.netServerConfig;
+    if (cfgModule) {
+      const active = await cfgModule.loadTrysteroStrategy();
+      joinRoomFn = active.joinRoom;
+    } else if (!joinRoomFn) {
       if (!joinRoomFnPromise) {
         joinRoomFnPromise = import('@trystero-p2p/torrent').then((mod) => {
           joinRoomFn = mod.joinRoom;
@@ -79,6 +83,7 @@
       appId: APP_ID,
       rtcConfig: { iceServers: DEFAULT_STUN }
     };
+    cfgModule?.applyStrategyConfig?.(config);
     lobbyRoom = joinRoomFn(config, LOBBY_ROOM_ID);
     const [send, receive] = lobbyRoom.makeAction(ANNOUNCE_CHANNEL);
     lobbySendAnnounce = send;

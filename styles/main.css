@@ -1237,6 +1237,9 @@ body.touch-mode .mobile-controls {
     top: 10px;
     left: 10px;
     right: auto;
+    /* 桌面端默认规则里 panel-status 使用 translateX(-50%) 居中，移动端必须
+       显式取消，否则 HUD 会被推出屏幕左侧，第一条信息条贴边甚至溢出。 */
+    transform: none;
     /* 留出右侧约 78px 给 panel-toggles（按钮宽 48 + 边距） */
     width: min(220px, calc(100vw - 88px));
     max-width: calc(100vw - 20px);
@@ -1351,6 +1354,7 @@ body.touch-mode .mobile-controls {
     top: 10px;
     left: 10px;
     right: auto;
+    transform: none;
     /* 留出右侧按钮列宽 42 + 16 ≈ 58px */
     width: min(280px, calc(100vw - 68px));
   }
@@ -1396,6 +1400,108 @@ body.touch-mode .mobile-controls {
   width: min(640px, calc(100vw - 32px));
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  position: relative;
+}
+
+/* 联机弹窗右上角设置（齿轮）按钮 */
+.mp-settings-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color-light);
+  background: var(--bg-color-content);
+  color: var(--text-color);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-card);
+  transition: transform 180ms ease, background-color 150ms ease;
+  padding: 0;
+}
+
+.mp-settings-btn:hover {
+  background: var(--primary-color-bg);
+  transform: rotate(45deg);
+}
+
+.mp-settings-btn:focus-visible {
+  outline: 2px solid var(--focus-yellow);
+  outline-offset: 2px;
+}
+
+/* 自定义服务器设置弹窗 */
+.mp-server-settings-card {
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.mp-strategy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mp-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--border-color-light);
+  border-radius: 12px;
+  background: var(--bg-color-content);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-color-body);
+}
+
+.mp-radio input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--primary-color);
+}
+
+.mp-radio:hover {
+  border-color: var(--primary-color);
+}
+
+.mp-field textarea {
+  border: 2px solid var(--border-color-light);
+  background: var(--bg-color-input);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font: inherit;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: var(--text-color-body);
+  outline: none;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.mp-field textarea:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-color-bg);
+}
+
+#mpRelayUrlsField[hidden] {
+  display: none;
+}
+
+.mp-server-hint {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.mp-server-hint a {
+  color: var(--primary-color-active);
 }
 
 .mp-section {

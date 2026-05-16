@@ -47,9 +47,22 @@
     if (!state.playerId) return;
 
     const drawables = [];
+    // 木地板视觉上是地面贴花：它的 y 与站在上面的玩家/敌人非常接近，参与
+    // y 排序时会出现"地板挡住角色"的情况。这里把 floor 单独抽出来，先于
+    // 所有可排序对象绘制，等价于贴在地块层之上、其它实体之下。
+    const floorIds = [];
     for (const structureId of getStructureIds()) {
       const transform = getComponent(structureId, 'transform');
-      if (transform) drawables.push({ y: transform.y, type: 'structure', id: structureId });
+      if (!transform) continue;
+      const structure = getComponent(structureId, 'structure');
+      if (structure?.kind === 'floor') {
+        floorIds.push(structureId);
+      } else {
+        drawables.push({ y: transform.y, type: 'structure', id: structureId });
+      }
+    }
+    for (const floorId of floorIds) {
+      drawStructure(floorId, shakeX, shakeY);
     }
     for (const entityId of getResourceIds()) {
       const transform = getComponent(entityId, 'transform');

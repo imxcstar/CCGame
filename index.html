@@ -96,8 +96,9 @@
 
   <div class="overlay" id="multiplayerOverlay">
     <div class="overlay-card multiplayer-card">
+      <button type="button" id="mpSettingsBtn" class="mp-settings-btn" aria-label="联机服务器设置" title="自定义中转服务器">⚙</button>
       <h2>联机房间</h2>
-      <p>基于 WebRTC + 公共 BitTorrent tracker 信令，无需服务器。把房间码分享给好友即可一起游玩。</p>
+      <p>基于 WebRTC + 公共 BitTorrent tracker 信令，无需服务器。把房间码分享给好友即可一起游玩。如公共信令不稳定，可在右上角 ⚙ 设置中配置自建中转服务器。</p>
 
       <div class="mp-section">
         <label class="mp-field">
@@ -181,6 +182,40 @@
 
       <div class="overlay-actions">
         <button type="button" id="mpCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="mpServerSettingsOverlay">
+    <div class="overlay-card mp-server-settings-card">
+      <h2>自定义中转服务器</h2>
+      <p>当公共 BitTorrent tracker 不稳定（房间扫描不到、加入后看不到房主）时，可切换到自建 <code>@trystero-p2p/ws-relay</code> 中转服务器。配置仅保存在本机浏览器；房间内所有玩家需使用相同的服务器才能互相发现。</p>
+
+      <div class="mp-section">
+        <div class="mp-strategy-options">
+          <label class="mp-radio">
+            <input type="radio" name="mpStrategy" value="torrent" id="mpStrategyTorrent">
+            <span><strong>公共 BitTorrent tracker</strong>（默认，无需服务器）</span>
+          </label>
+          <label class="mp-radio">
+            <input type="radio" name="mpStrategy" value="ws-relay" id="mpStrategyWsRelay">
+            <span><strong>自定义 WebSocket 中转</strong>（推荐，需自建）</span>
+          </label>
+        </div>
+
+        <label class="mp-field" id="mpRelayUrlsField">
+          <span>中转服务器地址（每行一条，支持 wss:// 或 ws://）</span>
+          <textarea id="mpRelayUrlsInput" rows="4" placeholder="wss://your-relay.example.com:8080" spellcheck="false" autocomplete="off"></textarea>
+        </label>
+
+        <div class="mp-server-hint subtle">如何自建中转服务器？请参考 <a href="README.md#自建中转服务器" target="_blank" rel="noopener">README · 自建中转服务器</a> 章节。</div>
+        <div class="mp-error" id="mpServerSettingsError"></div>
+      </div>
+
+      <div class="overlay-actions">
+        <button type="button" id="mpServerSettingsResetBtn">恢复默认</button>
+        <button type="button" id="mpServerSettingsCancelBtn">取消</button>
+        <button type="button" class="primary" id="mpServerSettingsSaveBtn">保存并应用</button>
       </div>
     </div>
   </div>

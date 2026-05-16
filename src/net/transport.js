@@ -45,16 +45,20 @@
   // —— 真正的 peerId 由 Trystero 内部生成并通过回调暴露给其他人。
 
   async function ensureTrystero() {
+    // 通过 server-config 加载激活的 trystero 策略包；用户可在联机设置里
+    // 切换到自定义的 ws-relay 中转服务器，这里会自动改用对应的 joinRoom。
+    const cfgModule = game.netServerConfig;
+    if (cfgModule) {
+      const active = await cfgModule.loadTrysteroStrategy();
+      trysteroJoinRoom = active.joinRoom;
+      trysteroSelfId = active.selfId || null;
+      return trysteroJoinRoom;
+    }
     if (trysteroJoinRoom) return trysteroJoinRoom;
-    // 动态 import 让单机模式不加载 Trystero / 其依赖
-    // 注意：torrent strategy 在 trystero v0.24 起已迁移到 @trystero-p2p/torrent，
-    // 旧路径 'trystero/torrent' 会在运行时抛弃用错误。
+    // 兜底路径（理论上 server-config 一定先加载）：保持原行为，使用 BitTorrent
+    // strategy（torrent 已迁移到 @trystero-p2p/torrent）。
     const mod = await import('@trystero-p2p/torrent');
     trysteroJoinRoom = mod.joinRoom;
-    // 真实的 Trystero selfId（模块加载时生成，全局唯一）。后续所有 channel 的
-    // receive 回调里 peerId 都是发送方的 Trystero selfId；我们必须用同一个 ID
-    // 作为本地玩家的标识，否则 Host 广播的 SNAPSHOT 里"客户端自己的条目"会
-    // 因为 ID 不匹配而被客户端误判为远端玩家，从而在客户端出现重影/拖影。
     trysteroSelfId = mod.selfId || null;
     return trysteroJoinRoom;
   }
@@ -118,6 +122,8 @@
     if (opts.password) {
       config.password = String(opts.password);
     }
+    // 注入自定义中转服务器（ws-relay strategy 需要 relayConfig.urls）
+    game.netServerConfig?.applyStrategyConfig?.(config);
     room = joinRoom(config, roomId);
     currentRoomId = roomId;
     // 使用 Trystero 真实的 selfId 作为本机 peer 标识；这是 Trystero 在
