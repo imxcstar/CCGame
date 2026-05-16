@@ -29,6 +29,7 @@
   ];
 
   let joinRoomFn = null;
+  let joinRoomFnPromise = null;
   let lobbyRoom = null;
   let lobbySendAnnounce = null;
   let lobbyMode = null; // 'browse' | 'announce' | null
@@ -64,9 +65,16 @@
   async function ensureJoin() {
     if (lobbyRoom) return lobbyRoom;
     if (!joinRoomFn) {
-      const mod = await import('@trystero-p2p/torrent');
-      joinRoomFn = mod.joinRoom;
+      // 并发调用 ensureJoin 时复用同一个 import promise，避免重复加载 trystero
+      if (!joinRoomFnPromise) {
+        joinRoomFnPromise = import('@trystero-p2p/torrent').then((mod) => {
+          joinRoomFn = mod.joinRoom;
+          return joinRoomFn;
+        });
+      }
+      await joinRoomFnPromise;
     }
+    if (lobbyRoom) return lobbyRoom;
     const config = {
       appId: APP_ID,
       rtcConfig: { iceServers: DEFAULT_STUN }
