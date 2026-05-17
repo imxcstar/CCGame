@@ -156,7 +156,16 @@
     }
 
     if (isEquippableItem(reference.item)) {
-      return selectItemReference(source, index);
+      // "设为手持" 表达的是用户的明确意图：把该物品作为当前手持。
+      // 不能复用 selectItemReference —— 它在槽位已被选中时会反向取消选中，
+      // 在移动端会造成"点了设为手持却没效果"（实际是从已选中变为空手）。
+      if (state.selectedInventoryIndex !== reference.inventoryIndex) {
+        clearSelectedWorldTarget?.();
+        setSelectedInventoryIndex(reference.inventoryIndex);
+      }
+      game.playSound?.('select');
+      showMessage('当前手持 ' + getItemConfig(reference.key).name);
+      return true;
     }
 
     showMessage(reference.item.name + ' 不能直接使用');
