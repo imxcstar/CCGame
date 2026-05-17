@@ -23,6 +23,12 @@
     ctx.beginPath();
     ctx.ellipse(0, 12, component.shadowRadius || 15, 6, 0, 0, Math.PI * 2);
     ctx.fill();
+    // 对支持旋转的建筑统一在精灵原点上应用 90° 步进旋转，使各 draw() 实现无需感知朝向。
+    // 阴影保持轴对齐绘制，以与未旋转时一致。
+    if (component.supportsRotation) {
+      const step = ((structure.rotation | 0) % 4 + 4) % 4;
+      if (step !== 0) ctx.rotate(step * Math.PI * 0.5);
+    }
     component.draw(structure);
     ctx.restore();
   }

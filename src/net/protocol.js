@@ -151,9 +151,10 @@
   //   'build'  - 放置一个建筑
   //              t = 物品 key，k = buildKind，x/y = 期望放置的世界坐标
   //   'interact' / 'cook' / 'refuel' / 'drink' / 'repair' / 'dismantle' /
-  //   'plant' / 'harvestPlanter'
+  //   'plant' / 'harvestPlanter' / 'rotate'
   //              对结构的交互。t = 结构 netId；其它字段视动作而定（如 refuel/drink
-  //              的 k = 'all' 表示填满 / 畅饮）
+  //              的 k = 'all' 表示填满 / 畅饮；'rotate' 仅对 supportsRotation 的结构
+  //              生效，每次将 structure.rotation 进 +1 步进，0..3 循环）
   //   'fishCast'  - t = tile 类型 ('water'/'deep')，x/y = 浮标世界坐标
   //   'fishReel'  - 没有目标，host 端用自己的 fishing state 解算
   function makeActionReq({ action = 'attack', target = '', tool = '', kind = '', x = 0, y = 0 } = {}) {

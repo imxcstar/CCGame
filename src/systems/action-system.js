@@ -721,6 +721,41 @@
     return true;
   }
 
+  function rotateStructure(structureId) {
+    const player = getPlayerSnapshot();
+    const transform = getComponent(structureId, 'transform');
+    const structure = getComponent(structureId, 'structure');
+    if (!player?.transform || !transform || !structure) return false;
+
+    const config = getStructureConfig(structure.kind);
+    if (!config?.supportsRotation) {
+      showMessage('该建筑无法调整方向');
+      return false;
+    }
+
+    if (dist(player.transform.x, player.transform.y, transform.x, transform.y) > 82) {
+      showMessage('离目标太远');
+      return false;
+    }
+
+    // 联机 client：把"调整方向"请求发给 host；本地仍立即旋转以提供即时反馈，
+    // host 校验通过后会通过下一帧 ENTITY_DELTA 覆写权威值。
+    const nextRotation = (((structure.rotation | 0) + 1) % 4 + 4) % 4;
+    structure.rotation = nextRotation;
+    burst(transform.x, transform.y, '#9bdcff', 5, 22);
+    game.playSound?.('click');
+
+    if (isClientMode()) {
+      dispatchStructureActionReq('rotate', structureId);
+      showMessage('已请求调整方向');
+      return true;
+    }
+
+    showMessage('已调整方向');
+    setScore();
+    return true;
+  }
+
   function attackResourceWithHands(resourceId) {
     const player = getPlayerSnapshot();
     const transform = getComponent(resourceId, 'transform');
@@ -837,6 +872,13 @@
         label: repairCost ? '修理 ' + Object.entries(repairCost).map(([key, value]) => getItemConfig(key).name + ' ' + value).join(' · ') : '无需修理',
         disabled: !canRepair
       });
+      if (config?.supportsRotation) {
+        actions.push({
+          id: 'rotate',
+          label: '调整方向',
+          disabled: distance > 82
+        });
+      }
       actions.push({
         id: 'dismantle',
         label: dismantleEnabled ? '拆卸' : '背包已满',
@@ -895,6 +937,7 @@
       if (actionId === 'cook-fish') return cookAtCampfire(target.id);
       if (actionId === 'drink-all') return drinkFromCollector(target.id, true);
       if (actionId === 'repair') return repairStructure(target.id);
+      if (actionId === 'rotate') return rotateStructure(target.id);
       if (actionId === 'dismantle') return dismantleStructure(target.id);
       return false;
     }
