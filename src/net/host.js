@@ -207,6 +207,8 @@
     if (typeof structure.crop !== 'undefined') out.crop = structure.crop || null;
     if (typeof structure.growth === 'number') out.growth = Math.round(structure.growth * 100) / 100;
     if (typeof structure.ready === 'boolean') out.ready = structure.ready;
+    // 旋转步进 (0..3)：仅在结构支持旋转且字段存在时下发，避免不必要带宽。
+    if (typeof structure.rotation === 'number') out.rotation = ((structure.rotation | 0) % 4 + 4) % 4;
     return out;
   }
 
@@ -689,6 +691,18 @@
     try { destroyEntity(target.id); } catch (err) { console.warn('[net/host] destroyEntity (structure)', err); }
   }
 
+  function handleStructureRotate(peerId, peerEntry, target) {
+    const ctx = getPeerStructure(target);
+    if (!ctx) return;
+    const { transform, structure } = ctx;
+    if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > REPAIR_DISMANTLE_RANGE) return;
+    const config = typeof game.getStructureConfig === 'function' ? game.getStructureConfig(structure.kind) : null;
+    if (!config?.supportsRotation) return;
+    structure.rotation = (((structure.rotation | 0) + 1) % 4 + 4) % 4;
+    if (typeof burst === 'function') burst(transform.x, transform.y, '#9bdcff', 5, 22);
+    // 新方向会随下一拍 ENTITY_DELTA 自动广播给所有 peer。
+  }
+
   function handleStructureHarvestPlanter(peerId, peerEntry, target) {
     const ctx = getPeerStructure(target);
     if (!ctx) return;
@@ -807,7 +821,7 @@
     // 其余动作都是 structure 相关：t = 结构 netId
     if (data.a === 'interact' || data.a === 'refuel' || data.a === 'drink' ||
         data.a === 'cook' || data.a === 'repair' || data.a === 'dismantle' ||
-        data.a === 'harvestPlanter') {
+        data.a === 'harvestPlanter' || data.a === 'rotate') {
       const target = resolveTargetByNetId(data.t);
       if (!target || target.group !== 'structure') {
         // 找不到目标 → 把 client 已扣除的资源退回去
@@ -833,6 +847,7 @@
       else if (data.a === 'cook') handleStructureCook(peerId, peerEntry, target);
       else if (data.a === 'repair') handleStructureRepair(peerId, peerEntry, target);
       else if (data.a === 'dismantle') handleStructureDismantle(peerId, peerEntry, target);
+      else if (data.a === 'rotate') handleStructureRotate(peerId, peerEntry, target);
       else if (data.a === 'harvestPlanter') handleStructureHarvestPlanter(peerId, peerEntry, target);
       return;
     }

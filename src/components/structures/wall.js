@@ -9,8 +9,11 @@
     radius: 16,
     collisionRadius: 12,
     shadowRadius: 18,
+    // 是否支持调整方向（0..3 共 4 个方向，每次旋转 90°）。
+    // drawStructureSprite 会根据该标记和 structure.rotation 统一应用 ctx.rotate。
+    supportsRotation: true,
     initialState() {
-      return {};
+      return { rotation: 0 };
     },
     draw() {
       ctx.fillStyle = '#8a6442';
