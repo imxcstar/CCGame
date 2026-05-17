@@ -529,6 +529,14 @@
         cache: 'no-store',
         signal: controller.signal
       });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new Error('服务器响应超时（8 秒），请检查地址或网络');
+      }
+      // fetch 在网络不可达 / CORS 等场景下抛 TypeError，原始信息往往是英文，
+      // 这里给出更易懂的中文兜底，便于用户排查（典型原因：服务器未运行、
+      // 缺少 CORS 头、wss:// 服务在 http 页面下被混合内容拦截等）。
+      throw new Error('无法连接到服务器（' + (err?.message || err) + '）');
     } finally {
       clearTimeout(timer);
     }
@@ -539,7 +547,7 @@
     try {
       info = await resp.json();
     } catch {
-      throw new Error('返回内容不是合法 JSON');
+      throw new Error('返回内容不是合法 JSON（可能不是 CCGame 中转服务器）');
     }
     const type = info && typeof info.type === 'string' ? info.type : '';
     if (type !== 'ws-relay' && type !== 'ws-fullrelay') {
