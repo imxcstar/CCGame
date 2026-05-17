@@ -21,14 +21,38 @@
     drawEnemySprite
   } = game;
 
-  // 朝向辅助：将 8 方向（含 4 个对角）映射回 4 方向用于贴图选择；
-  // 对角朝向（upleft/upright/downleft/downright）使用侧面贴图（保留 x 朝向），
-  // 上下分量由手持工具角度与手部偏移体现。
-  function getRenderFacing(facing) {
-    if (facing === 'up' || facing === 'down' || facing === 'left' || facing === 'right') return facing;
-    if (facing === 'upleft' || facing === 'downleft') return 'left';
-    if (facing === 'upright' || facing === 'downright') return 'right';
-    return 'down';
+  // 朝向辅助：将 8 方向解析为身体贴图配置。
+  // - up        → 背面帧（看到后脑勺）
+  // - down      → 正面帧（看到脸）
+  // - left/right→ 侧面帧（明确的左右朝向）
+  // - 4 个对角  → 用对应正/背面帧 + 小角度倾斜来暗示左右朝向，
+  //               使 8 方向在视觉上彼此可辨。
+  const DIAGONAL_BODY_TILT = 0.22; // 弧度，约 12.6°
+  function getBodyOrientation(facing) {
+    switch (facing) {
+      case 'up':        return { frame: 'back',  side: null,    tilt: 0 };
+      case 'upleft':    return { frame: 'back',  side: null,    tilt: -DIAGONAL_BODY_TILT };
+      case 'upright':   return { frame: 'back',  side: null,    tilt:  DIAGONAL_BODY_TILT };
+      case 'left':      return { frame: 'side',  side: 'left',  tilt: 0 };
+      case 'right':     return { frame: 'side',  side: 'right', tilt: 0 };
+      case 'downleft':  return { frame: 'front', side: null,    tilt: -DIAGONAL_BODY_TILT };
+      case 'downright': return { frame: 'front', side: null,    tilt:  DIAGONAL_BODY_TILT };
+      case 'down':
+      default:          return { frame: 'front', side: null,    tilt: 0 };
+    }
+  }
+
+  function drawPlayerBody(facing, bounce, legSwing, armSwing) {
+    const orientation = getBodyOrientation(facing);
+    const tilt = orientation.tilt;
+    if (tilt) {
+      ctx.save();
+      ctx.rotate(tilt);
+    }
+    if (orientation.frame === 'back') drawPlayerBackFrame(bounce, legSwing, armSwing);
+    else if (orientation.frame === 'side') drawPlayerSideFrame(orientation.side, bounce, legSwing, armSwing);
+    else drawPlayerFrontFrame(bounce, legSwing, armSwing);
+    if (tilt) ctx.restore();
   }
 
   // 无瞄准目标时，根据 8 方向朝向计算默认工具角度（与 atan2(y, x) 一致，y 向下）。
@@ -45,6 +69,11 @@
 
   function getFacingAngle(facing) {
     return FACING_ANGLES[facing] ?? 0;
+  }
+
+  // 判断该朝向是否“背对镜头”（up 系列），影响工具的绘制顺序与透明度。
+  function isBackFacing(facing) {
+    return facing === 'up' || facing === 'upleft' || facing === 'upright';
   }
 
   function drawTile(tileX, tileY, shakeX, shakeY) {
@@ -284,18 +313,16 @@
     ctx.fill();
 
     if (player.hurtTimer > 0) ctx.globalAlpha = 0.74;
-    const renderFacing = getRenderFacing(player.facing);
-    if (renderFacing === 'up') {
+    const facing = player.facing;
+    if (isBackFacing(facing)) {
+      // 背对镜头：先画工具（被身体遮挡），再画身体
       ctx.save();
       ctx.globalAlpha *= 0.85;
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
       ctx.restore();
-      drawPlayerBackFrame(bounce, legSwing, armSwing);
-    } else if (renderFacing === 'left' || renderFacing === 'right') {
-      drawPlayerSideFrame(renderFacing, bounce, legSwing, armSwing);
-      drawHeldTool(toolKey, heldAngle, 1 - bounce);
+      drawPlayerBody(facing, bounce, legSwing, armSwing);
     } else {
-      drawPlayerFrontFrame(bounce, legSwing, armSwing);
+      drawPlayerBody(facing, bounce, legSwing, armSwing);
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
     }
 
@@ -379,7 +406,7 @@
     const legSwing = peer.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
     const armSwing = peer.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
     const bounce = peer.isMoving ? Math.abs(Math.sin(walkPhase)) * 1.4 : 0;
-    const facing = getRenderFacing(peer.facing || 'down');
+    const facing = peer.facing || 'down';
 
     ctx.save();
     ctx.translate(screen.x, screen.y);
@@ -390,13 +417,7 @@
     ctx.ellipse(0, 12, 12, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (facing === 'up') {
-      drawPlayerBackFrame(bounce, legSwing, armSwing);
-    } else if (facing === 'left' || facing === 'right') {
-      drawPlayerSideFrame(facing, bounce, legSwing, armSwing);
-    } else {
-      drawPlayerFrontFrame(bounce, legSwing, armSwing);
-    }
+    drawPlayerBody(facing, bounce, legSwing, armSwing);
 
     // 玩家颜色描边（区分远端玩家）
     if (peer.color) {
