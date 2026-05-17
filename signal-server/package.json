@@ -1,0 +1,17 @@
+{
+  "name": "ccgame-signal-relay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CCGame WebRTC 信令转发服务器（基于 @trystero-p2p/ws-relay）。只转发 WebRTC 握手信令，游戏数据仍走 P2P。",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@trystero-p2p/ws-relay": "^0.24.0"
+  }
+}

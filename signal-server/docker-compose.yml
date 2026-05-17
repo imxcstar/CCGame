@@ -1,0 +1,23 @@
+# WebRTC 信令转发服务器（仅转发 WebRTC 握手，游戏数据走 P2P）
+# 使用：docker compose up -d
+# 默认监听 8080；浏览器在 https:// 页面下需 wss://，请在前面套 Caddy / Nginx 反代终结 TLS。
+services:
+  signal-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ccgame-signal-relay:latest
+    container_name: ccgame-signal-relay
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      NODE_ENV: production
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

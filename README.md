@@ -144,6 +144,8 @@ console.log('CCGame relay listening on ws://0.0.0.0:8080');
 node server.js
 ```
 
+> 仓库已经在 [`signal-server/`](./signal-server) 提供了一份开箱即用的版本（含 `Dockerfile` 和 `docker-compose.yml`），可直接 `cd signal-server && docker compose up -d` 启动，或本地 `npm install && npm start`。
+
 建议通过 `systemd` / `pm2` / `docker` 等方式保活：
 
 ```bash
@@ -196,6 +198,13 @@ cd server
 npm install
 npm start            # 默认监听 0.0.0.0:8090
 # PORT=9000 HOST=127.0.0.1 npm start  # 自定义端口 / 监听地址
+```
+
+或使用 Docker（仓库自带 `server/Dockerfile` 和 `server/docker-compose.yml`）：
+
+```bash
+cd server
+docker compose up -d
 ```
 
 TLS 反代示例与方案 A 相同（仅需把端口改成 8090）。详见 [`server/README.md`](./server/README.md)。

@@ -1,0 +1,23 @@
+# 完整数据中转服务器（fullrelay）
+# 使用：docker compose up -d
+# 默认监听 8090；如需 wss，请在前面套 Caddy / Nginx 反代终结 TLS。
+services:
+  fullrelay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ccgame-fullrelay:latest
+    container_name: ccgame-fullrelay
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8090
+      NODE_ENV: production
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
