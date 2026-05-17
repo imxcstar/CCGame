@@ -25,34 +25,41 @@
   // - up        → 背面帧（看到后脑勺）
   // - down      → 正面帧（看到脸）
   // - left/right→ 侧面帧（明确的左右朝向）
-  // - 4 个对角  → 用对应正/背面帧 + 小角度倾斜来暗示左右朝向，
-  //               使 8 方向在视觉上彼此可辨。
-  const DIAGONAL_BODY_TILT = 0.22; // 弧度，约 12.6°
+  // - 4 个对角  → 专门的 3/4 视角斜角帧（不再使用倾斜旋转），
+  //               通过偏移头部、错开肩膀与双腿来表达左右朝向。
   function getBodyOrientation(facing) {
     switch (facing) {
-      case 'up':        return { frame: 'back',  side: null,    tilt: 0 };
-      case 'upleft':    return { frame: 'back',  side: null,    tilt: -DIAGONAL_BODY_TILT };
-      case 'upright':   return { frame: 'back',  side: null,    tilt:  DIAGONAL_BODY_TILT };
-      case 'left':      return { frame: 'side',  side: 'left',  tilt: 0 };
-      case 'right':     return { frame: 'side',  side: 'right', tilt: 0 };
-      case 'downleft':  return { frame: 'front', side: null,    tilt: -DIAGONAL_BODY_TILT };
-      case 'downright': return { frame: 'front', side: null,    tilt:  DIAGONAL_BODY_TILT };
+      case 'up':        return { frame: 'back',       side: null    };
+      case 'upleft':    return { frame: 'back-diag',  side: 'left'  };
+      case 'upright':   return { frame: 'back-diag',  side: 'right' };
+      case 'left':      return { frame: 'side',       side: 'left'  };
+      case 'right':     return { frame: 'side',       side: 'right' };
+      case 'downleft':  return { frame: 'front-diag', side: 'left'  };
+      case 'downright': return { frame: 'front-diag', side: 'right' };
       case 'down':
-      default:          return { frame: 'front', side: null,    tilt: 0 };
+      default:          return { frame: 'front',      side: null    };
     }
   }
 
   function drawPlayerBody(facing, bounce, legSwing, armSwing) {
     const orientation = getBodyOrientation(facing);
-    const tilt = orientation.tilt;
-    if (tilt) {
-      ctx.save();
-      ctx.rotate(tilt);
+    switch (orientation.frame) {
+      case 'back':
+        drawPlayerBackFrame(bounce, legSwing, armSwing);
+        break;
+      case 'back-diag':
+        drawPlayerBackDiagonalFrame(orientation.side, bounce, legSwing, armSwing);
+        break;
+      case 'side':
+        drawPlayerSideFrame(orientation.side, bounce, legSwing, armSwing);
+        break;
+      case 'front-diag':
+        drawPlayerFrontDiagonalFrame(orientation.side, bounce, legSwing, armSwing);
+        break;
+      case 'front':
+      default:
+        drawPlayerFrontFrame(bounce, legSwing, armSwing);
     }
-    if (orientation.frame === 'back') drawPlayerBackFrame(bounce, legSwing, armSwing);
-    else if (orientation.frame === 'side') drawPlayerSideFrame(orientation.side, bounce, legSwing, armSwing);
-    else drawPlayerFrontFrame(bounce, legSwing, armSwing);
-    if (tilt) ctx.restore();
   }
 
   // 无瞄准目标时，根据 8 方向朝向计算默认工具角度（与 atan2(y, x) 一致，y 向下）。
@@ -244,6 +251,93 @@
     ctx.fillRect(5, -11 - bounce, 2, 2);
     ctx.fillStyle = '#23496b';
     ctx.fillRect(5, 3 - bounce - armSwing * 0.35, 3, 11);
+    ctx.restore();
+  }
+
+  // 正面 3/4 视角（朝向下方但偏左/右）：
+  // - 通过把头、躯干和五官略微偏向朝向侧，并让靠近镜头的肩膀 / 手臂更靠前，
+  //   远离镜头的手臂被躯干部分遮挡，画出真正的斜角贴图，不再依赖整体旋转。
+  // - side 表示角色朝向的水平方向：'right' 直接绘制；'left' 通过水平镜像复用。
+  function drawPlayerFrontDiagonalFrame(side, bounce, legSwing, armSwing) {
+    ctx.save();
+    if (side === 'left') ctx.scale(-1, 1);
+
+    // 腿：左右错开，朝向侧（右）腿略靠前下，体现斜向迈步
+    ctx.fillStyle = '#80604a';
+    ctx.fillRect(-5, 17 - bounce, 4, 10 + Math.max(0, legSwing));
+    ctx.fillRect(2, 18 - bounce, 4, 10 + Math.max(0, -legSwing));
+
+    // 远侧（左）手臂：先画，会被躯干部分遮挡
+    ctx.fillStyle = '#23496b';
+    ctx.fillRect(-9, 4 - bounce + armSwing * 0.35, 3, 10);
+
+    // 躯干：略向朝向侧偏移、宽度稍窄，呈 3/4 透视
+    ctx.fillStyle = '#3a6fa2';
+    ctx.fillRect(-6, -1 - bounce, 14, 18);
+    // 朝向侧（右）肩部凸出，强调近侧
+    ctx.fillRect(7, 0 - bounce, 3, 7);
+
+    // 近侧（右）手臂：在躯干之上，朝前略低
+    ctx.fillStyle = '#23496b';
+    ctx.fillRect(8, 5 - bounce - armSwing * 0.35, 3, 11);
+
+    // 头部：圆心向朝向侧偏移 1px
+    ctx.fillStyle = '#d8cbb3';
+    ctx.beginPath();
+    ctx.arc(1, -9 - bounce, 7, 0, Math.PI * 2);
+    ctx.fill();
+    // 帽子也跟随偏移
+    ctx.fillStyle = '#8f6a50';
+    ctx.fillRect(-4, -14 - bounce, 10, 3);
+    // 眼睛整体偏向朝向侧（右），强化朝向感
+    ctx.fillStyle = '#fff7f0';
+    ctx.fillRect(-2, -12 - bounce, 2, 2);
+    ctx.fillRect(3, -12 - bounce, 2, 2);
+    // 朝向侧耳/脸颊轮廓：在远侧脸颊处加一抹深色阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    ctx.fillRect(-6, -10 - bounce, 2, 4);
+
+    ctx.restore();
+  }
+
+  // 背面 3/4 视角（朝向上方但偏左/右）：与正面斜角对称，但绘制的是后脑勺与发块。
+  function drawPlayerBackDiagonalFrame(side, bounce, legSwing, armSwing) {
+    ctx.save();
+    if (side === 'left') ctx.scale(-1, 1);
+
+    ctx.fillStyle = '#80604a';
+    ctx.fillRect(-5, 17 - bounce, 4, 10 + Math.max(0, legSwing));
+    ctx.fillRect(2, 18 - bounce, 4, 10 + Math.max(0, -legSwing));
+
+    // 远侧（左）手臂
+    ctx.fillStyle = '#1f4260';
+    ctx.fillRect(-9, 4 - bounce + armSwing * 0.2, 3, 10);
+
+    // 躯干（背部色）
+    ctx.fillStyle = '#315f89';
+    ctx.fillRect(-6, -1 - bounce, 14, 18);
+    // 朝向侧肩部
+    ctx.fillRect(7, 0 - bounce, 3, 7);
+    // 后背中间的深色块（衣服后片），同样向朝向侧偏移以呈现 3/4 视角
+    ctx.fillStyle = '#1d3c58';
+    ctx.fillRect(-3, 4 - bounce, 8, 7);
+
+    // 近侧（右）手臂
+    ctx.fillStyle = '#1f4260';
+    ctx.fillRect(8, 5 - bounce - armSwing * 0.2, 3, 10);
+
+    // 后脑勺：偏向朝向侧
+    ctx.fillStyle = '#d8cbb3';
+    ctx.beginPath();
+    ctx.arc(1, -9 - bounce, 7, 0, Math.PI * 2);
+    ctx.fill();
+    // 头发帽边
+    ctx.fillStyle = '#8f6a50';
+    ctx.fillRect(-4, -7 - bounce, 10, 3);
+    // 远侧脸颊阴影，强化朝向感
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    ctx.fillRect(-6, -10 - bounce, 2, 4);
+
     ctx.restore();
   }
 
