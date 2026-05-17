@@ -21,6 +21,32 @@
     drawEnemySprite
   } = game;
 
+  // 朝向辅助：将 8 方向（含 4 个对角）映射回 4 方向用于贴图选择；
+  // 对角朝向（upleft/upright/downleft/downright）使用侧面贴图（保留 x 朝向），
+  // 上下分量由手持工具角度与手部偏移体现。
+  function getRenderFacing(facing) {
+    if (facing === 'up' || facing === 'down' || facing === 'left' || facing === 'right') return facing;
+    if (facing === 'upleft' || facing === 'downleft') return 'left';
+    if (facing === 'upright' || facing === 'downright') return 'right';
+    return 'down';
+  }
+
+  // 无瞄准目标时，根据 8 方向朝向计算默认工具角度（与 atan2(y, x) 一致，y 向下）。
+  const FACING_ANGLES = {
+    right: 0,
+    downright: Math.PI * 0.25,
+    down: Math.PI * 0.5,
+    downleft: Math.PI * 0.75,
+    left: Math.PI,
+    upleft: -Math.PI * 0.75,
+    up: -Math.PI * 0.5,
+    upright: -Math.PI * 0.25
+  };
+
+  function getFacingAngle(facing) {
+    return Object.prototype.hasOwnProperty.call(FACING_ANGLES, facing) ? FACING_ANGLES[facing] : 0;
+  }
+
   function drawTile(tileX, tileY, shakeX, shakeY) {
     const tile = tileAt(tileX, tileY);
     const worldX = tileX * TILE;
@@ -95,8 +121,8 @@
     const playerScreen = worldToScreen(transform.x, transform.y, shakeX, shakeY);
     const bobberScreen = worldToScreen(state.fishing.x, state.fishing.y, shakeX, shakeY);
     const bobOffset = Math.sin(state.fishing.animationTime || 0) * (state.fishing.phase === 'bite' ? 2.2 : 1.1);
-    const handX = player.facing === 'left' ? -6 : 6;
-    const handY = player.facing === 'up' ? -4 : player.facing === 'down' ? 2 : 0;
+    const handX = player.facing.includes('left') ? -6 : 6;
+    const handY = player.facing.startsWith('up') ? -4 : player.facing.startsWith('down') ? 2 : 0;
     const arcHeight = Math.max(18, Math.min(54, Math.abs(bobberScreen.x - playerScreen.x) * 0.22 + 18));
 
     ctx.save();
@@ -233,13 +259,7 @@
     const aimTarget = toolKey === 'fishingRod' && state.fishing?.active ? state.fishing : pointerWorld;
     const angle = aimTarget
       ? Math.atan2(aimTarget.y - transform.y, aimTarget.x - transform.x)
-      : player.facing === 'left'
-        ? Math.PI
-        : player.facing === 'up'
-          ? -Math.PI * 0.5
-          : player.facing === 'down'
-            ? Math.PI * 0.5
-            : 0;
+      : getFacingAngle(player.facing);
     const walkPhase = player.animationTime || 0;
     const legSwing = player.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
     const armSwing = player.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
@@ -264,14 +284,15 @@
     ctx.fill();
 
     if (player.hurtTimer > 0) ctx.globalAlpha = 0.74;
-    if (player.facing === 'up') {
+    const renderFacing = getRenderFacing(player.facing);
+    if (renderFacing === 'up') {
       ctx.save();
       ctx.globalAlpha *= 0.85;
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
       ctx.restore();
       drawPlayerBackFrame(bounce, legSwing, armSwing);
-    } else if (player.facing === 'left' || player.facing === 'right') {
-      drawPlayerSideFrame(player.facing, bounce, legSwing, armSwing);
+    } else if (renderFacing === 'left' || renderFacing === 'right') {
+      drawPlayerSideFrame(renderFacing, bounce, legSwing, armSwing);
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
     } else {
       drawPlayerFrontFrame(bounce, legSwing, armSwing);
@@ -358,7 +379,7 @@
     const legSwing = peer.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
     const armSwing = peer.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
     const bounce = peer.isMoving ? Math.abs(Math.sin(walkPhase)) * 1.4 : 0;
-    const facing = peer.facing || 'down';
+    const facing = getRenderFacing(peer.facing || 'down');
 
     ctx.save();
     ctx.translate(screen.x, screen.y);
