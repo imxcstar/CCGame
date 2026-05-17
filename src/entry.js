@@ -61,6 +61,7 @@ import './ui/panels.js';
 import './ui/interactions.js';
 import './net/protocol.js';
 import './net/server-config.js';
+import './net/ws-fullrelay.js';
 import './net/transport.js';
 import './net/host.js';
 import './net/client.js';

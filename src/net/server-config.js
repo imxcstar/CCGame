@@ -17,8 +17,9 @@
   const STORAGE_KEY = 'ccgame.mp.serverConfig.v1';
 
   // strategy 取值：
-  //   'torrent'  - 默认，使用公共 BitTorrent tracker（无需架服务器）
-  //   'ws-relay' - 使用 @trystero-p2p/ws-relay，可填多条 wss:// URL
+  //   'torrent'      - 默认，使用公共 BitTorrent tracker（无需架服务器）
+  //   'ws-relay'     - 使用 @trystero-p2p/ws-relay，自建信令中转（数据仍走 P2P）
+  //   'ws-fullrelay' - 使用 server/ 下自建的完整数据中转（所有 channel 走 WS）
   const DEFAULT_CONFIG = Object.freeze({
     strategy: 'torrent',
     relayUrls: []
@@ -41,10 +42,16 @@
   }
 
   function normalize(config) {
-    const strategy = config && config.strategy === 'ws-relay' ? 'ws-relay' : 'torrent';
+    const rawStrategy = config && typeof config.strategy === 'string' ? config.strategy : 'torrent';
+    let strategy;
+    if (rawStrategy === 'ws-relay' || rawStrategy === 'ws-fullrelay') {
+      strategy = rawStrategy;
+    } else {
+      strategy = 'torrent';
+    }
     const relayUrls = sanitizeUrls(config && config.relayUrls);
-    // ws-relay 模式必须至少一个有效 URL，否则降级回 torrent
-    if (strategy === 'ws-relay' && relayUrls.length === 0) {
+    // ws-relay / ws-fullrelay 模式必须至少一个有效 URL，否则降级回 torrent
+    if ((strategy === 'ws-relay' || strategy === 'ws-fullrelay') && relayUrls.length === 0) {
       return { strategy: 'torrent', relayUrls: [] };
     }
     return { strategy, relayUrls };
@@ -105,16 +112,31 @@
       return activeJoinPromise;
     }
     activeJoinPromise = (async () => {
-      let mod;
-      if (target === 'ws-relay') {
-        mod = await import('@trystero-p2p/ws-relay');
+      let joinRoom;
+      let modSelfId = null;
+      if (target === 'ws-fullrelay') {
+        // 走仓库自带的完整数据中转客户端（src/net/ws-fullrelay.js）
+        const impl = game.netWsFullrelay;
+        if (!impl) {
+          throw new Error('ws-fullrelay 客户端模块尚未加载');
+        }
+        joinRoom = impl.joinRoom;
+        // 提前为下一次 joinRoom 分配 selfId；transport.js 在 ensureTrystero
+        // 阶段缓存的就是这个值，保证 getSelfId() 与服务器看到的 self 一致。
+        modSelfId = impl.prepareSelfId ? impl.prepareSelfId() : (impl.selfId || null);
+      } else if (target === 'ws-relay') {
+        const mod = await import('@trystero-p2p/ws-relay');
+        joinRoom = mod.joinRoom;
+        modSelfId = mod.selfId || null;
       } else {
-        mod = await import('@trystero-p2p/torrent');
+        const mod = await import('@trystero-p2p/torrent');
+        joinRoom = mod.joinRoom;
+        modSelfId = mod.selfId || null;
       }
       activeStrategy = {
         strategy: target,
-        joinRoom: mod.joinRoom,
-        selfId: mod.selfId || null
+        joinRoom,
+        selfId: modSelfId
       };
       return activeStrategy;
     })();
@@ -132,7 +154,7 @@
 
   // 把自定义 relay URL 合并进 trystero join 配置
   function applyStrategyConfig(joinConfig) {
-    if (current.strategy === 'ws-relay' && current.relayUrls.length > 0) {
+    if ((current.strategy === 'ws-relay' || current.strategy === 'ws-fullrelay') && current.relayUrls.length > 0) {
       joinConfig.relayConfig = { urls: current.relayUrls.slice() };
     }
     return joinConfig;

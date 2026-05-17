@@ -1,0 +1,17 @@
+{
+  "name": "ccgame-fullrelay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CCGame 完整数据中转服务器（ws-fullrelay）。所有 channel 消息通过 WebSocket 透传，可在 P2P 不通的网络环境下使用。",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
