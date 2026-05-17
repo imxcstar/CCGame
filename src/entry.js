@@ -23,6 +23,7 @@ import './components/entities/tree.js';
 import './components/entities/palm.js';
 import './components/entities/rock.js';
 import './components/entities/bush.js';
+import './components/entities/mushroomPatch.js';
 import './components/entities/registry.js';
 import './components/entities.js';
 import './components/structures/campfire.js';
