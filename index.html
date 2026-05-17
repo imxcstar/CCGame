@@ -105,9 +105,9 @@
 
   <div class="overlay" id="multiplayerOverlay">
     <div class="overlay-card multiplayer-card">
-      <button type="button" id="mpSettingsBtn" class="mp-settings-btn" aria-label="联机服务器设置" title="自定义中转服务器">⚙</button>
+      <button type="button" id="mpSettingsBtn" class="mp-settings-btn" aria-label="联机服务器设置" title="联机服务器设置">⚙</button>
       <h2>联机房间</h2>
-      <p>基于 WebRTC + 公共 BitTorrent tracker 信令，无需服务器。把房间码分享给好友即可一起游玩。如公共信令不稳定，可在右上角 ⚙ 设置中配置自建中转服务器。</p>
+      <p>把房间码分享给好友，就能一起游玩。如果连接不稳定，可点右上角 ⚙ 切换联机服务器。</p>
 
       <div class="mp-section">
         <label class="mp-field">
@@ -186,7 +186,7 @@
           <button type="button" id="mpLeaveBtn">离开房间</button>
         </div>
 
-        <p class="mp-note">提示：当前为联机基础功能（房间 + 聊天）。游戏世界同步将在后续版本中提供。</p>
+        <p class="mp-note">提示：进入房间后，由房主点击「开始生存」即可一起游玩。</p>
       </div>
 
       <div class="overlay-actions">
@@ -198,26 +198,26 @@
   <div class="overlay" id="mpServerSettingsOverlay">
     <div class="overlay-card mp-server-settings-card">
       <h2>联机服务器</h2>
-      <p>当公共 BitTorrent tracker 不稳定时，可以切换到自建的中转服务器。配置仅保存在本机浏览器；房间内所有玩家需使用相同的服务器才能互相发现。</p>
+      <p>如果默认服务器连接不稳定，可以填写自建的服务器地址。配置只保存在你的浏览器；同一房间里的所有玩家需要使用相同的服务器才能互相发现。</p>
 
       <div class="mp-section">
         <div class="mp-strategy-options">
           <label class="mp-radio">
             <input type="radio" name="mpStrategy" value="public" id="mpStrategyPublic">
-            <span><strong>公共服务器</strong>（默认，使用公共 BitTorrent tracker，无需自建服务器）</span>
+            <span><strong>默认服务器</strong>（推荐，无需任何配置）</span>
           </label>
           <label class="mp-radio">
             <input type="radio" name="mpStrategy" value="custom" id="mpStrategyCustom">
-            <span><strong>自定义服务器</strong>（填写自建中转地址，保存时将自动识别是「信令中转」还是「完整数据中转」）</span>
+            <span><strong>自定义服务器</strong>（填写自建的服务器地址，保存时会自动识别类型）</span>
           </label>
         </div>
 
         <label class="mp-field" id="mpRelayUrlsField">
-          <span id="mpRelayUrlsFieldLabel">中转服务器地址（每行一条，支持 wss:// 或 ws://；多条可做故障转移）</span>
+          <span id="mpRelayUrlsFieldLabel">服务器地址（每行一条，以 wss:// 或 ws:// 开头；填多条可做备用）</span>
           <textarea id="mpRelayUrlsInput" rows="4" placeholder="wss://your-relay.example.com:8080" spellcheck="false" autocomplete="off"></textarea>
         </label>
 
-        <div class="mp-server-hint subtle">如何自建中转服务器？请参考 <a href="README.md#自建中转服务器" target="_blank" rel="noopener">README · 自建中转服务器</a> 章节。</div>
+        <div class="mp-server-hint subtle">如何自建服务器？请参考 <a href="README.md#自建中转服务器" target="_blank" rel="noopener">README · 自建服务器</a> 章节。</div>
         <div class="mp-error" id="mpServerSettingsError"></div>
       </div>
 

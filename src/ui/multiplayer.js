@@ -547,11 +547,11 @@
     try {
       info = await resp.json();
     } catch {
-      throw new Error('返回内容不是合法 JSON（可能不是 CCGame 中转服务器）');
+      throw new Error('服务器响应格式不对（可能不是 CCGame 服务器）');
     }
     const type = info && typeof info.type === 'string' ? info.type : '';
     if (type !== 'ws-relay' && type !== 'ws-fullrelay') {
-      throw new Error('未知的服务器类型：' + (type || '(空)'));
+      throw new Error('不支持的服务器类型：' + (type || '(空)'));
     }
     return type;
   }
@@ -565,7 +565,7 @@
     if (choice === 'public') {
       game.netServerConfig.setServerConfig({ strategy: 'torrent', relayUrls: [] });
       closeServerSettings();
-      setError('已切换到公共服务器。如已在房间中，连接已断开，请重新创建 / 加入房间。');
+      setError('已切换到默认服务器。如已在房间中，连接已断开，请重新创建 / 加入房间。');
       return;
     }
 
@@ -596,7 +596,7 @@
           throw new Error(`无法识别地址 ${urls[i]}：${err?.message || err}`);
         }
         if (t !== firstType) {
-          throw new Error(`地址 ${urls[i]} 的类型 (${t}) 与首条 (${firstType}) 不一致，请使用同类型的服务器`);
+          throw new Error(`地址 ${urls[i]} 与第一条地址的服务器类型不一致，请使用同一类型的服务器`);
         }
       }
       game.netServerConfig.setServerConfig({
@@ -604,7 +604,7 @@
         relayUrls: urls
       });
       closeServerSettings();
-      const label = firstType === 'ws-fullrelay' ? '完整数据中转' : '信令中转';
+      const label = firstType === 'ws-fullrelay' ? '完整中转' : '仅信令';
       setError(`已应用自定义服务器（${label}）。如已在房间中，连接已断开，请重新创建 / 加入房间。`);
     } catch (err) {
       if (errEl) errEl.textContent = '识别服务器失败：' + (err?.message || err);
