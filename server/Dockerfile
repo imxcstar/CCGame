@@ -8,8 +8,8 @@ WORKDIR /app
 # 仅复制 manifest，利用 Docker 层缓存
 COPY package.json package-lock.json* ./
 
-# 仅安装生产依赖
-RUN npm ci --omit=dev || npm install --omit=dev
+# 使用 lockfile 安装生产依赖
+RUN npm ci --omit=dev
 
 # 复制源码
 COPY index.js ./
