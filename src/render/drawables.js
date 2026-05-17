@@ -406,9 +406,9 @@
     const transform = getComponent(state.playerId, 'transform');
     if (!transform) return;
 
-    // 建造范围与 canPlaceStructure 中的 dist 阈值（118）保持一致
-    const BUILD_RANGE = 118;
-    const range = BUILD_RANGE;
+    // 建造范围与 canPlaceStructure 中使用的 BUILD_RANGE 一致
+    const range = game.BUILD_RANGE;
+    if (!Number.isFinite(range)) return;
     const minTileX = Math.floor((transform.x - range) / TILE);
     const maxTileX = Math.floor((transform.x + range) / TILE);
     const minTileY = Math.floor((transform.y - range) / TILE);

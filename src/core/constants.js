@@ -8,6 +8,7 @@
   const DAY_LENGTH = 170;
   const ATTACK_RANGE = 70;
   const HOTBAR_SIZE = 5;
+  const BUILD_RANGE = 118;
 
   Object.assign(game, {
     TILE,
@@ -18,6 +19,7 @@
     MINIMAP_BASE_SIZE,
     DAY_LENGTH,
     ATTACK_RANGE,
-    HOTBAR_SIZE
+    HOTBAR_SIZE,
+    BUILD_RANGE
   });
 })(window.TidalIsle);
