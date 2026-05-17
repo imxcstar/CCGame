@@ -656,7 +656,8 @@
     const cookingRecipes = game.COOKING_RECIPES || {};
     const recipeKey = (target.cookRecipeKey && cookingRecipes[target.cookRecipeKey]) ? target.cookRecipeKey : 'grilledFish';
     const recipe = cookingRecipes[recipeKey];
-    const fuelCost = recipe?.fuelCost | 0 || 10;
+    // 注意：用 ?? 而不是 || 取回退值，避免 fuelCost === 0 时被误判为缺省。
+    const fuelCost = (recipe && typeof recipe.fuelCost === 'number') ? (recipe.fuelCost | 0) : 10;
 
     if (!recipe || (structure.fuel || 0) < fuelCost) {
       // 燃料不足 / 菜谱无效：把客户端已扣的食材退回去（refundOnFail 已由 handleActionReq
