@@ -197,27 +197,23 @@
 
   <div class="overlay" id="mpServerSettingsOverlay">
     <div class="overlay-card mp-server-settings-card">
-      <h2>自定义中转服务器</h2>
+      <h2>联机服务器</h2>
       <p>当公共 BitTorrent tracker 不稳定时，可以切换到自建的中转服务器。配置仅保存在本机浏览器；房间内所有玩家需使用相同的服务器才能互相发现。</p>
 
       <div class="mp-section">
         <div class="mp-strategy-options">
           <label class="mp-radio">
-            <input type="radio" name="mpStrategy" value="torrent" id="mpStrategyTorrent">
-            <span><strong>公共 BitTorrent tracker</strong>（默认，无需服务器）</span>
+            <input type="radio" name="mpStrategy" value="public" id="mpStrategyPublic">
+            <span><strong>公共服务器</strong>（默认，使用公共 BitTorrent tracker，无需自建服务器）</span>
           </label>
           <label class="mp-radio">
-            <input type="radio" name="mpStrategy" value="ws-relay" id="mpStrategyWsRelay">
-            <span><strong>自定义 WebSocket 信令中转</strong>（<code>@trystero-p2p/ws-relay</code>，仅转发 WebRTC 握手，数据仍走 P2P）</span>
-          </label>
-          <label class="mp-radio">
-            <input type="radio" name="mpStrategy" value="ws-fullrelay" id="mpStrategyWsFullrelay">
-            <span><strong>完整数据中转</strong>（推荐 P2P 不通时使用：所有游戏数据均通过中转服务器转发，需自建 <code>server/</code> 目录下的服务）</span>
+            <input type="radio" name="mpStrategy" value="custom" id="mpStrategyCustom">
+            <span><strong>自定义服务器</strong>（填写自建中转地址，保存时将自动识别是「信令中转」还是「完整数据中转」）</span>
           </label>
         </div>
 
         <label class="mp-field" id="mpRelayUrlsField">
-          <span id="mpRelayUrlsFieldLabel">中转服务器地址（每行一条，支持 wss:// 或 ws://）</span>
+          <span id="mpRelayUrlsFieldLabel">中转服务器地址（每行一条，支持 wss:// 或 ws://；多条可做故障转移）</span>
           <textarea id="mpRelayUrlsInput" rows="4" placeholder="wss://your-relay.example.com:8080" spellcheck="false" autocomplete="off"></textarea>
         </label>
 
