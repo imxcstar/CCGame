@@ -44,7 +44,7 @@
   };
 
   function getFacingAngle(facing) {
-    return Object.prototype.hasOwnProperty.call(FACING_ANGLES, facing) ? FACING_ANGLES[facing] : 0;
+    return FACING_ANGLES[facing] ?? 0;
   }
 
   function drawTile(tileX, tileY, shakeX, shakeY) {
