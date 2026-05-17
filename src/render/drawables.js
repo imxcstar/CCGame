@@ -21,6 +21,61 @@
     drawEnemySprite
   } = game;
 
+  // 朝向辅助：将 8 方向解析为身体贴图配置。
+  // - up        → 背面帧（看到后脑勺）
+  // - down      → 正面帧（看到脸）
+  // - left/right→ 侧面帧（明确的左右朝向）
+  // - 4 个对角  → 用对应正/背面帧 + 小角度倾斜来暗示左右朝向，
+  //               使 8 方向在视觉上彼此可辨。
+  const DIAGONAL_BODY_TILT = 0.22; // 弧度，约 12.6°
+  function getBodyOrientation(facing) {
+    switch (facing) {
+      case 'up':        return { frame: 'back',  side: null,    tilt: 0 };
+      case 'upleft':    return { frame: 'back',  side: null,    tilt: -DIAGONAL_BODY_TILT };
+      case 'upright':   return { frame: 'back',  side: null,    tilt:  DIAGONAL_BODY_TILT };
+      case 'left':      return { frame: 'side',  side: 'left',  tilt: 0 };
+      case 'right':     return { frame: 'side',  side: 'right', tilt: 0 };
+      case 'downleft':  return { frame: 'front', side: null,    tilt: -DIAGONAL_BODY_TILT };
+      case 'downright': return { frame: 'front', side: null,    tilt:  DIAGONAL_BODY_TILT };
+      case 'down':
+      default:          return { frame: 'front', side: null,    tilt: 0 };
+    }
+  }
+
+  function drawPlayerBody(facing, bounce, legSwing, armSwing) {
+    const orientation = getBodyOrientation(facing);
+    const tilt = orientation.tilt;
+    if (tilt) {
+      ctx.save();
+      ctx.rotate(tilt);
+    }
+    if (orientation.frame === 'back') drawPlayerBackFrame(bounce, legSwing, armSwing);
+    else if (orientation.frame === 'side') drawPlayerSideFrame(orientation.side, bounce, legSwing, armSwing);
+    else drawPlayerFrontFrame(bounce, legSwing, armSwing);
+    if (tilt) ctx.restore();
+  }
+
+  // 无瞄准目标时，根据 8 方向朝向计算默认工具角度（与 atan2(y, x) 一致，y 向下）。
+  const FACING_ANGLES = {
+    right: 0,
+    downright: Math.PI * 0.25,
+    down: Math.PI * 0.5,
+    downleft: Math.PI * 0.75,
+    left: Math.PI,
+    upleft: -Math.PI * 0.75,
+    up: -Math.PI * 0.5,
+    upright: -Math.PI * 0.25
+  };
+
+  function getFacingAngle(facing) {
+    return FACING_ANGLES[facing] ?? 0;
+  }
+
+  // 判断该朝向是否“背对镜头”（up 系列），影响工具的绘制顺序与透明度。
+  function isBackFacing(facing) {
+    return facing === 'up' || facing === 'upleft' || facing === 'upright';
+  }
+
   function drawTile(tileX, tileY, shakeX, shakeY) {
     const tile = tileAt(tileX, tileY);
     const worldX = tileX * TILE;
@@ -95,8 +150,8 @@
     const playerScreen = worldToScreen(transform.x, transform.y, shakeX, shakeY);
     const bobberScreen = worldToScreen(state.fishing.x, state.fishing.y, shakeX, shakeY);
     const bobOffset = Math.sin(state.fishing.animationTime || 0) * (state.fishing.phase === 'bite' ? 2.2 : 1.1);
-    const handX = player.facing === 'left' ? -6 : 6;
-    const handY = player.facing === 'up' ? -4 : player.facing === 'down' ? 2 : 0;
+    const handX = player.facing.includes('left') ? -6 : 6;
+    const handY = player.facing.startsWith('up') ? -4 : player.facing.startsWith('down') ? 2 : 0;
     const arcHeight = Math.max(18, Math.min(54, Math.abs(bobberScreen.x - playerScreen.x) * 0.22 + 18));
 
     ctx.save();
@@ -233,13 +288,7 @@
     const aimTarget = toolKey === 'fishingRod' && state.fishing?.active ? state.fishing : pointerWorld;
     const angle = aimTarget
       ? Math.atan2(aimTarget.y - transform.y, aimTarget.x - transform.x)
-      : player.facing === 'left'
-        ? Math.PI
-        : player.facing === 'up'
-          ? -Math.PI * 0.5
-          : player.facing === 'down'
-            ? Math.PI * 0.5
-            : 0;
+      : getFacingAngle(player.facing);
     const walkPhase = player.animationTime || 0;
     const legSwing = player.isMoving ? Math.sin(walkPhase) * 2.6 : 0;
     const armSwing = player.isMoving ? Math.sin(walkPhase + Math.PI) * 2.2 : 0;
@@ -264,17 +313,16 @@
     ctx.fill();
 
     if (player.hurtTimer > 0) ctx.globalAlpha = 0.74;
-    if (player.facing === 'up') {
+    const facing = player.facing;
+    if (isBackFacing(facing)) {
+      // 背对镜头：先画工具（被身体遮挡），再画身体
       ctx.save();
       ctx.globalAlpha *= 0.85;
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
       ctx.restore();
-      drawPlayerBackFrame(bounce, legSwing, armSwing);
-    } else if (player.facing === 'left' || player.facing === 'right') {
-      drawPlayerSideFrame(player.facing, bounce, legSwing, armSwing);
-      drawHeldTool(toolKey, heldAngle, 1 - bounce);
+      drawPlayerBody(facing, bounce, legSwing, armSwing);
     } else {
-      drawPlayerFrontFrame(bounce, legSwing, armSwing);
+      drawPlayerBody(facing, bounce, legSwing, armSwing);
       drawHeldTool(toolKey, heldAngle, 1 - bounce);
     }
 
@@ -369,13 +417,7 @@
     ctx.ellipse(0, 12, 12, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (facing === 'up') {
-      drawPlayerBackFrame(bounce, legSwing, armSwing);
-    } else if (facing === 'left' || facing === 'right') {
-      drawPlayerSideFrame(facing, bounce, legSwing, armSwing);
-    } else {
-      drawPlayerFrontFrame(bounce, legSwing, armSwing);
-    }
+    drawPlayerBody(facing, bounce, legSwing, armSwing);
 
     // 玩家颜色描边（区分远端玩家）
     if (peer.color) {
