@@ -191,6 +191,19 @@
     entry.btn?.classList.toggle('active', visible);
   }
 
+  // 关闭指定移动端面板（若未在触屏模式下则等价于隐藏面板）
+  function closeMobilePanel(panelId) {
+    const entries = getToggleEntries();
+    const entry = entries.find((item) => item.panel?.id === panelId);
+    if (!entry) return;
+    if (isTouchMode()) {
+      setMobileVisible(entry, false);
+    } else {
+      entry.panel.classList.add('panel-hidden');
+      entry.btn?.classList.remove('active');
+    }
+  }
+
   // 公开的统一面板切换：根据当前是否为触屏决定行为
   function togglePanel(panelId) {
     const entries = getToggleEntries();
@@ -223,34 +236,22 @@
 
   // ----------------------------------------------------------------
   // 背包格触屏点击 = 选中物品并打开介绍 + 操作菜单（无需长按）
-  // 移动端：将操作菜单与介绍组合成底部停靠面板，避免相互遮挡
+  // 移动端：把"图标 + 名称 + 描述 + 操作按钮"合并到同一个 itemMenu 容器，
+  // 不再单独显示 tooltip，避免互相遮挡或占用两块屏幕区域
   // ----------------------------------------------------------------
-  function dockTooltipAndMenuAtBottom() {
-    const tipEl = dom.itemTooltipEl;
+  function dockItemMenuAtBottom() {
     const menuEl = dom.itemMenuEl;
-    if (!tipEl || !menuEl) return;
+    if (!menuEl) return;
 
     const sideMargin = 12;
     const bottomMargin = 12;
-    const gap = 8;
 
-    const menuVisible = menuEl.classList.contains('show');
-
-    // 统一宽度并贴左右边缘，保证可读区域最大化
-    [tipEl, menuEl].forEach((el) => {
-      el.style.left = sideMargin + 'px';
-      el.style.right = sideMargin + 'px';
-      el.style.width = 'auto';
-      el.style.maxWidth = 'none';
-      el.style.top = 'auto';
-    });
-
+    menuEl.style.left = sideMargin + 'px';
+    menuEl.style.right = sideMargin + 'px';
+    menuEl.style.width = 'auto';
+    menuEl.style.maxWidth = 'none';
+    menuEl.style.top = 'auto';
     menuEl.style.bottom = bottomMargin + 'px';
-
-    // 介绍贴在菜单上方；若菜单未显示（如默认拳头），介绍直接贴底
-    const menuHeight = menuVisible ? menuEl.offsetHeight : 0;
-    const tipBottom = bottomMargin + (menuVisible ? menuHeight + gap : 0);
-    tipEl.style.bottom = tipBottom + 'px';
   }
 
   function bindInventoryTouchMenu() {
@@ -293,15 +294,12 @@
       const source = target.dataset.slotSource;
       const index = Number(target.dataset.slotIndex);
 
-      // 先按桌面坐标打开（内部会做边界钳制），随后改用底部停靠布局覆盖位置
+      // 触屏：把描述嵌入到 itemMenu 内部（标题 + 描述 + 按钮），不再单独
+      // 显示 tooltip，符合"只要一个容器"的移动端交互需求
       const rect = target.getBoundingClientRect();
-      game.openItemMenu?.(source, index, rect.left, rect.bottom);
-      const reference = game.getDisplayReference?.(source, index);
-      if (reference) {
-        game.renderTooltip?.(reference, source, index, rect.left, rect.top);
-      }
-      // 等待菜单/介绍渲染后取真实高度，再统一停靠到底部
-      dockTooltipAndMenuAtBottom();
+      game.closeTooltip?.();
+      game.openItemMenu?.(source, index, rect.left, rect.bottom, { showDescription: true });
+      dockItemMenuAtBottom();
 
       reset();
     });
@@ -318,7 +316,9 @@
 
   Object.assign(game, {
     bindMobileControls,
-    togglePanel
+    togglePanel,
+    isTouchMode,
+    closeMobilePanel
   });
 
   // 兼容游戏内 state 未使用的引用，避免被打包工具警告

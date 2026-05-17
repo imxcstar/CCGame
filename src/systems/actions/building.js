@@ -2,6 +2,7 @@
   const {
     state,
     TILE,
+    BUILD_RANGE,
     dist,
     tileAtWorld,
     tileWalkable,
@@ -25,7 +26,7 @@
     const player = getPlayerSnapshot();
     if (!player?.transform) return false;
     if (!tileWalkable(tileAtWorld(x, y))) return false;
-    if (dist(player.transform.x, player.transform.y, x, y) > 118) return false;
+    if (dist(player.transform.x, player.transform.y, x, y) > BUILD_RANGE) return false;
 
     for (const structureId of getStructureIds()) {
       const transform = getComponent(structureId, 'transform');
