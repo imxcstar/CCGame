@@ -14,6 +14,7 @@
     meatLoot: [1, 2],
     getDamage(tool) {
       if (tool === 'spear') return 4.3;
+      if (tool === 'club') return 2.8;
       if (tool === 'axe') return 2.2;
       if (tool === 'pickaxe') return 1.8;
       return 1.2;

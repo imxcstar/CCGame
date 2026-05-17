@@ -42,7 +42,8 @@
     tree: { name: '树木', description: '可以采集木材，石斧会更高效。' },
     palm: { name: '棕榈树', description: '可以采集木材和椰子。' },
     rock: { name: '岩石', description: '可以采集石块，石镐会更高效。' },
-    bush: { name: '灌木', description: '可以采集纤维和浆果。' }
+    bush: { name: '灌木', description: '可以采集纤维和浆果。' },
+    mushroomPatch: { name: '蘑菇丛', description: '可以采集蘑菇和少量纤维，徒手即可。' }
   };
 
   const ENEMY_DISPLAY = {
