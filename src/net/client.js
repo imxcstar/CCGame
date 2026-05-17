@@ -462,7 +462,8 @@
   //   options.kind: 用于扩展 'interact' / 'refuel' / 'drink' 等子动作的附加信息
   //                 - interact 时填 structure.kind（plant 走 'planter' 时填 'plant'）
   //                 - refuel/drink 时 'all' 表示填满 / 畅饮
-  //   options.tool: 用于 cook 时携带"被扣的鱼 key"，或 repair 时携带 cost JSON
+  //   options.tool: 用于 cook 时携带"client 实际扣除的食材 JSON"（{ key: count }），
+  //                 或 repair 时携带 cost JSON
   function requestStructureAction(action, structureId, options = {}) {
     if (!active || !worldReady) return false;
     if (!action || !structureId) return false;

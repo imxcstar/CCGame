@@ -651,16 +651,25 @@
     const { transform, structure } = ctx;
     if (structure.kind !== 'campfire') return;
     if (dist(peerEntry.x || 0, peerEntry.y || 0, transform.x, transform.y) > STRUCTURE_RANGE) return;
-    if ((structure.fuel || 0) < 10) {
-      // 燃料不足：把客户端已扣的鱼退回去（fish key 写在 data.k 字段）
-      refundPeerItems(peerId, target.refundOnFail ? { [target.refundOnFail]: 1 } : null, 'cook_no_fuel');
+
+    // recipeKey 通过 data.k 上报；缺省回退到旧的 grilledFish 行为以兼容旧客户端。
+    const cookingRecipes = game.COOKING_RECIPES || {};
+    const recipeKey = (target.cookRecipeKey && cookingRecipes[target.cookRecipeKey]) ? target.cookRecipeKey : 'grilledFish';
+    const recipe = cookingRecipes[recipeKey];
+    // 注意：用 ?? 而不是 || 取回退值，避免 fuelCost === 0 时被误判为缺省。
+    const fuelCost = (recipe && typeof recipe.fuelCost === 'number') ? (recipe.fuelCost | 0) : 10;
+
+    if (!recipe || (structure.fuel || 0) < fuelCost) {
+      // 燃料不足 / 菜谱无效：把客户端已扣的食材退回去（refundOnFail 已由 handleActionReq
+      // 解析为 { itemKey: count, ... }）
+      refundPeerItems(peerId, target.refundOnFail || null, recipe ? 'cook_no_fuel' : 'cook_no_recipe');
       return;
     }
-    structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
+    structure.fuel = Math.max(0, (structure.fuel || 0) - fuelCost);
     if (typeof burst === 'function') burst(transform.x, transform.y, '#ffc887', 7, 28);
     netTransport.send(
       NET_CHANNELS.INVENTORY,
-      netMakeInventoryUpdate({ items: { grilledFish: 1 }, reason: 'cook' }),
+      netMakeInventoryUpdate({ items: recipe.output || { grilledFish: 1 }, reason: 'cook' }),
       peerId
     );
   }
@@ -760,6 +769,31 @@
     );
   }
 
+  // 解析 cook 请求中 client 实际消耗的食材：
+  //   新协议：data.tk 是 JSON 序列化的 { itemKey: count, ... }
+  //   旧协议（兼容）：data.tk 是单个鱼 key 字符串
+  // 解析失败返回 null。
+  function parseCookRefund(tkValue) {
+    if (typeof tkValue !== 'string' || !tkValue) return null;
+    if (tkValue.startsWith('{')) {
+      try {
+        const obj = JSON.parse(tkValue);
+        if (obj && typeof obj === 'object') {
+          const clean = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const amount = (v | 0);
+            if (typeof k === 'string' && k && amount > 0) clean[k] = amount;
+          }
+          return Object.keys(clean).length ? clean : null;
+        }
+      } catch (err) {
+        console.warn('[net/host] cook refund parse error', err);
+      }
+      return null;
+    }
+    return { [tkValue]: 1 };
+  }
+
   function handleActionReq(data, peerId) {
     if (!active || !state.running || state.over) return;
     if (!data || typeof data !== 'object' || !peerId) return;
@@ -775,11 +809,13 @@
       if (data.a === 'build') {
         refundPeerBuild(peerId, typeof data.t === 'string' ? data.t : '', 'build_throttled');
       } else if (data.a === 'refuel' || data.a === 'cook') {
-        // 这些动作 client 已扣除 1 wood / 1 fish；被节流时回退
-        const refund = {};
-        if (data.a === 'refuel') refund.wood = 1;
-        if (data.a === 'cook' && typeof data.tk === 'string' && data.tk) refund[data.tk] = 1;
-        refundPeerItems(peerId, refund, data.a + '_throttled');
+        // 这些动作 client 已扣除 1 wood / 1 或多份食材；被节流时回退
+        if (data.a === 'refuel') {
+          refundPeerItems(peerId, { wood: 1 }, 'refuel_throttled');
+        } else {
+          const refund = parseCookRefund(data.tk);
+          if (refund) refundPeerItems(peerId, refund, 'cook_throttled');
+        }
       } else if (data.a === 'interact') {
         // plant 子动作有 seedPack 扣除；其它子动作（取水/添柴）也需要 wood 退回
         const refund = {};
@@ -828,7 +864,10 @@
         if (data.a === 'interact' && data.k === 'plant') refundPeerItems(peerId, { seedPack: 1 }, 'interact_no_target');
         else if (data.a === 'interact' && data.k === 'campfire') refundPeerItems(peerId, { wood: 1 }, 'interact_no_target');
         else if (data.a === 'refuel') refundPeerItems(peerId, { wood: 1 }, 'refuel_no_target');
-        else if (data.a === 'cook' && data.tk) refundPeerItems(peerId, { [data.tk]: 1 }, 'cook_no_target');
+        else if (data.a === 'cook') {
+          const refund = parseCookRefund(data.tk);
+          if (refund) refundPeerItems(peerId, refund, 'cook_no_target');
+        }
         else if (data.a === 'repair' && data.tk) {
           try {
             const cost = JSON.parse(data.tk);
@@ -839,8 +878,11 @@
         }
         return;
       }
-      // 携带 client 扣除的物品 key（用于失败时退款）
-      if (data.a === 'cook') target.refundOnFail = data.tk || null;
+      // 携带 client 扣除的物品 map（用于失败时退款），以及希望烹饪的菜谱键
+      if (data.a === 'cook') {
+        target.refundOnFail = parseCookRefund(data.tk);
+        target.cookRecipeKey = typeof data.k === 'string' ? data.k : '';
+      }
       if (data.a === 'interact') handleStructureInteract(peerId, peerEntry, target);
       else if (data.a === 'refuel') handleStructureRefuel(peerId, peerEntry, target, data.k === 'all');
       else if (data.a === 'drink') handleStructureDrink(peerId, peerEntry, target, data.k === 'all');

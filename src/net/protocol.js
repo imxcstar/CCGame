@@ -154,7 +154,10 @@
   //   'plant' / 'harvestPlanter' / 'rotate'
   //              对结构的交互。t = 结构 netId；其它字段视动作而定（如 refuel/drink
   //              的 k = 'all' 表示填满 / 畅饮；'rotate' 仅对 supportsRotation 的结构
-  //              生效，每次将 structure.rotation 进 +1 步进，0..3 循环）
+  //              生效，每次将 structure.rotation 进 +1 步进，0..3 循环；
+  //              'cook' 时 k = 菜谱 key（如 'grilledFish'/'fisherStew' 等，见
+  //              COOKING_RECIPES），tk = JSON 序列化的 { 物品key: 数量 } 表示
+  //              client 实际扣除的食材，便于 host 失败时整体退款）
   //   'fishCast'  - t = tile 类型 ('water'/'deep')，x/y = 浮标世界坐标
   //   'fishReel'  - 没有目标，host 端用自己的 fishing state 解算
   function makeActionReq({ action = 'attack', target = '', tool = '', kind = '', x = 0, y = 0 } = {}) {
