@@ -50,11 +50,35 @@
     crawler: { name: '暗潮爬行者', description: '夜晚会主动追击你，长矛对它更有效。' }
   };
 
-  const CAMPFIRE_COOKABLE_FISH_KEYS = ['eel', 'mackerel', 'sardine'];
-
-  function getCookableFishKey(inventory) {
-    if (!inventory) return null;
-    return CAMPFIRE_COOKABLE_FISH_KEYS.find((key) => countInventoryItem(inventory, key) > 0) || null;
+  // 将菜谱 cost 解析为"实际要从背包扣除的具体物品 map"。
+  //   - 普通 key 直接累加
+  //   - 通配符 key（如 'fish'）按 COOKING_WILDCARDS 列出的候选优先级
+  //     选取背包中库存最充足的一种作为实际消耗。
+  // 若任一项无法凑齐，返回 null。
+  function resolveCookingCost(inventory, recipeCost) {
+    if (!inventory || !recipeCost) return null;
+    const wildcards = game.COOKING_WILDCARDS || {};
+    const consumed = {};
+    const acc = (key, amount) => { consumed[key] = (consumed[key] || 0) + amount; };
+    for (const [costKey, costAmount] of Object.entries(recipeCost)) {
+      const amount = costAmount | 0;
+      if (amount <= 0) continue;
+      if (wildcards[costKey]) {
+        // 在候选列表中选第一个剩余量足够 (扣除已计划消耗后) 的具体食材
+        let pickedKey = null;
+        for (const candidate of wildcards[costKey]) {
+          const available = countInventoryItem(inventory, candidate) - (consumed[candidate] || 0);
+          if (available >= amount) { pickedKey = candidate; break; }
+        }
+        if (!pickedKey) return null;
+        acc(pickedKey, amount);
+      } else {
+        const available = countInventoryItem(inventory, costKey) - (consumed[costKey] || 0);
+        if (available < amount) return null;
+        acc(costKey, amount);
+      }
+    }
+    return consumed;
   }
 
   function getPlanterActionState(inventory, structure, near) {
@@ -527,7 +551,7 @@
     return false;
   }
 
-  function cookAtCampfire(structureId) {
+  function cookAtCampfire(structureId, recipeKey = 'grilledFish') {
     const player = getPlayerSnapshot();
     const transform = getComponent(structureId, 'transform');
     const structure = getComponent(structureId, 'structure');
@@ -537,30 +561,50 @@
       return false;
     }
 
-    if ((structure.fuel || 0) < 10) {
+    const recipe = (game.COOKING_RECIPES || {})[recipeKey];
+    if (!recipe) {
+      showMessage('未知的菜谱');
+      return false;
+    }
+
+    const fuelCost = recipe.fuelCost | 0;
+    if ((structure.fuel || 0) < fuelCost) {
       showMessage('篝火火力不足');
       return false;
     }
 
-    const fishKey = getCookableFishKey(player.inventory);
-    if (!fishKey) {
-      showMessage('需要沙丁鱼、鲭鱼或鳗鱼才能烹饪');
+    const consumed = resolveCookingCost(player.inventory, recipe.cost);
+    if (!consumed) {
+      showMessage('食材不足：' + (recipe.hint || recipe.name));
       return false;
     }
 
-    removeItemFromInventory(player.inventory, fishKey, 1);
+    if (!canStoreAllItems(player.inventory, recipe.output)) {
+      showMessage('背包空间不足');
+      return false;
+    }
+
+    // 本地扣除食材（联机时 host 会在失败时通过 INVENTORY 退回）
+    for (const [key, amount] of Object.entries(consumed)) {
+      removeItemFromInventory(player.inventory, key, amount);
+    }
+
     if (isClientMode()) {
       burst(transform.x, transform.y, '#ffc887', 7, 28);
       game.playSound?.('fire');
-      showMessage('已请求烹饪：烤鱼');
-      dispatchStructureActionReq('cook', structureId, { tool: fishKey });
+      showMessage('已请求烹饪：' + recipe.name);
+      // 将菜谱键放进 kind，实际消耗 JSON 放进 tool，便于 host 失败时退款。
+      dispatchStructureActionReq('cook', structureId, {
+        kind: recipeKey,
+        tool: JSON.stringify(consumed)
+      });
       return true;
     }
-    structure.fuel = Math.max(0, (structure.fuel || 0) - 10);
-    addInventory({ grilledFish: 1 });
+    structure.fuel = Math.max(0, (structure.fuel || 0) - fuelCost);
+    addInventory(recipe.output);
     burst(transform.x, transform.y, '#ffc887', 7, 28);
     game.playSound?.('fire');
-    showMessage('烹饪完成：烤鱼');
+    showMessage('烹饪完成：' + recipe.name);
     setScore();
     return true;
   }
@@ -842,15 +886,25 @@
 
       if (target.structure.kind === 'campfire') {
         const hasWood = countInventoryItem(player.inventory, 'wood') > 0;
-        const cookableFish = getCookableFishKey(player.inventory);
         const missingFuel = Math.max(0, 120 - (target.structure.fuel || 0));
         actions.push({ id: 'interact', label: hasWood ? '添柴' : '缺少木材', disabled: !near || !hasWood || missingFuel <= 0 });
         actions.push({ id: 'refuel-max', label: hasWood ? '添满' : '添满', disabled: !near || !hasWood || missingFuel <= 0 });
-        actions.push({
-          id: 'cook-fish',
-          label: cookableFish ? '烤鱼' : '缺少可烤鱼类',
-          disabled: !near || !cookableFish || (target.structure.fuel || 0) < 10
-        });
+
+        // 为每个烹饪菜谱生成一个按钮。缺料 / 缺燃料 / 距离过远时按钮禁用。
+        const cookingRecipes = game.COOKING_RECIPES || {};
+        for (const [recipeKey, recipe] of Object.entries(cookingRecipes)) {
+          const fuelCost = recipe.fuelCost | 0;
+          const enoughFuel = (target.structure.fuel || 0) >= fuelCost;
+          const ingredientsOk = !!resolveCookingCost(player.inventory, recipe.cost);
+          let label = recipe.name;
+          if (!ingredientsOk) label = recipe.name + '（缺食材）';
+          else if (!enoughFuel) label = recipe.name + '（火力不足）';
+          actions.push({
+            id: 'cook:' + recipeKey,
+            label,
+            disabled: !near || !ingredientsOk || !enoughFuel
+          });
+        }
       }
 
       if (target.structure.kind === 'collector') {
@@ -935,7 +989,10 @@
     if (target.group === 'structure') {
       if (actionId === 'interact') return interactWithStructure(target.id);
       if (actionId === 'refuel-max') return refuelCampfire(target.id, true);
-      if (actionId === 'cook-fish') return cookAtCampfire(target.id);
+      if (actionId === 'cook-fish') return cookAtCampfire(target.id, 'grilledFish');
+      if (typeof actionId === 'string' && actionId.startsWith('cook:')) {
+        return cookAtCampfire(target.id, actionId.slice(5));
+      }
       if (actionId === 'drink-all') return drinkFromCollector(target.id, true);
       if (actionId === 'repair') return repairStructure(target.id);
       if (actionId === 'rotate') return rotateStructure(target.id);
