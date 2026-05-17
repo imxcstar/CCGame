@@ -462,16 +462,18 @@
 
   // ---- 自定义中转服务器设置 ----
 
-  function getStrategyFromForm() {
-    if (dom.mpStrategyWsFullrelay?.checked) return 'ws-fullrelay';
-    if (dom.mpStrategyWsRelay?.checked) return 'ws-relay';
-    return 'torrent';
+  // UI 上只有「公共 / 自定义」两个选择；底层 server-config 仍然区分
+  // 'torrent' / 'ws-relay' / 'ws-fullrelay'，因此「自定义」模式下我们会
+  // 在保存时通过协议接口 `/ccgame-info` 自动探测服务器类型。
+  function getStrategyChoiceFromForm() {
+    if (dom.mpStrategyCustom?.checked) return 'custom';
+    return 'public';
   }
 
   function applyStrategyToForm(strategy) {
-    if (dom.mpStrategyTorrent) dom.mpStrategyTorrent.checked = strategy === 'torrent';
-    if (dom.mpStrategyWsRelay) dom.mpStrategyWsRelay.checked = strategy === 'ws-relay';
-    if (dom.mpStrategyWsFullrelay) dom.mpStrategyWsFullrelay.checked = strategy === 'ws-fullrelay';
+    const isCustom = strategy === 'ws-relay' || strategy === 'ws-fullrelay';
+    if (dom.mpStrategyPublic) dom.mpStrategyPublic.checked = !isCustom;
+    if (dom.mpStrategyCustom) dom.mpStrategyCustom.checked = isCustom;
   }
 
   function openServerSettings() {
@@ -488,14 +490,8 @@
   }
 
   function syncServerSettingsFieldVisibility() {
-    const strategy = getStrategyFromForm();
-    const showUrls = strategy === 'ws-relay' || strategy === 'ws-fullrelay';
-    if (dom.mpRelayUrlsField) dom.mpRelayUrlsField.hidden = !showUrls;
-    if (dom.mpRelayUrlsFieldLabel) {
-      dom.mpRelayUrlsFieldLabel.textContent = strategy === 'ws-fullrelay'
-        ? '完整中转服务器地址（每行一条，支持 wss:// 或 ws://；多条可做故障转移）'
-        : '中转服务器地址（每行一条，支持 wss:// 或 ws://）';
-    }
+    const choice = getStrategyChoiceFromForm();
+    if (dom.mpRelayUrlsField) dom.mpRelayUrlsField.hidden = choice !== 'custom';
   }
 
   function parseRelayUrls(text) {
@@ -505,28 +501,116 @@
       .filter(Boolean);
   }
 
-  function handleSaveServerSettings() {
-    if (!game.netServerConfig) return;
-    const strategy = getStrategyFromForm();
-    const needsUrls = strategy === 'ws-relay' || strategy === 'ws-fullrelay';
-    const urls = parseRelayUrls(dom.mpRelayUrlsInput?.value || '');
-    if (needsUrls) {
-      if (urls.length === 0) {
-        if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '请填写至少一个 wss:// 或 ws:// 地址。';
-        return;
-      }
-      const bad = urls.find((u) => !/^wss?:\/\//i.test(u));
-      if (bad) {
-        if (dom.mpServerSettingsError) dom.mpServerSettingsError.textContent = '地址必须以 wss:// 或 ws:// 开头：' + bad;
-        return;
-      }
+  // 把 ws(s):// 地址转成对应的 http(s):// 协议探测地址。
+  // 例：wss://relay.example.com:8090/path -> https://relay.example.com:8090/ccgame-info
+  function toInfoUrl(wsUrl) {
+    try {
+      const u = new URL(wsUrl);
+      const httpProto = u.protocol === 'wss:' ? 'https:' : 'http:';
+      const portPart = u.port ? `:${u.port}` : '';
+      return `${httpProto}//${u.hostname}${portPart}/ccgame-info`;
+    } catch {
+      return null;
     }
-    game.netServerConfig.setServerConfig({
-      strategy,
-      relayUrls: needsUrls ? urls : []
-    });
-    closeServerSettings();
-    setError('已应用新的中转服务器设置。如已在房间中，连接已断开，请重新创建 / 加入房间。');
+  }
+
+  // 拉取 /ccgame-info，识别服务器类型。返回 'ws-relay' / 'ws-fullrelay'，
+  // 失败抛错。设置短超时，避免用户长时间等待。
+  async function probeServerType(wsUrl) {
+    const infoUrl = toInfoUrl(wsUrl);
+    if (!infoUrl) throw new Error('无法解析地址：' + wsUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let resp;
+    try {
+      resp = await fetch(infoUrl, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new Error('服务器响应超时（8 秒），请检查地址或网络');
+      }
+      // fetch 在网络不可达 / CORS 等场景下抛 TypeError，原始信息往往是英文，
+      // 这里给出更易懂的中文兜底，便于用户排查（典型原因：服务器未运行、
+      // 缺少 CORS 头、wss:// 服务在 http 页面下被混合内容拦截等）。
+      throw new Error('无法连接到服务器（' + (err?.message || err) + '）');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    let info;
+    try {
+      info = await resp.json();
+    } catch {
+      throw new Error('返回内容不是合法 JSON（可能不是 CCGame 中转服务器）');
+    }
+    const type = info && typeof info.type === 'string' ? info.type : '';
+    if (type !== 'ws-relay' && type !== 'ws-fullrelay') {
+      throw new Error('未知的服务器类型：' + (type || '(空)'));
+    }
+    return type;
+  }
+
+  async function handleSaveServerSettings() {
+    if (!game.netServerConfig) return;
+    const errEl = dom.mpServerSettingsError;
+    const choice = getStrategyChoiceFromForm();
+    if (errEl) errEl.textContent = '';
+
+    if (choice === 'public') {
+      game.netServerConfig.setServerConfig({ strategy: 'torrent', relayUrls: [] });
+      closeServerSettings();
+      setError('已切换到公共服务器。如已在房间中，连接已断开，请重新创建 / 加入房间。');
+      return;
+    }
+
+    const urls = parseRelayUrls(dom.mpRelayUrlsInput?.value || '');
+    if (urls.length === 0) {
+      if (errEl) errEl.textContent = '请填写至少一个 wss:// 或 ws:// 地址。';
+      return;
+    }
+    const bad = urls.find((u) => !/^wss?:\/\//i.test(u));
+    if (bad) {
+      if (errEl) errEl.textContent = '地址必须以 wss:// 或 ws:// 开头：' + bad;
+      return;
+    }
+
+    const saveBtn = dom.mpServerSettingsSaveBtn;
+    const prevText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '正在识别服务器…'; }
+    try {
+      // 用首条地址探测类型；所有地址需为同类型，否则后续条目作为故障转移
+      // 也只能按相同策略使用。
+      const firstType = await probeServerType(urls[0]);
+      // 校验其余地址类型与首条一致
+      for (let i = 1; i < urls.length; i += 1) {
+        let t;
+        try {
+          t = await probeServerType(urls[i]);
+        } catch (err) {
+          throw new Error(`无法识别地址 ${urls[i]}：${err?.message || err}`);
+        }
+        if (t !== firstType) {
+          throw new Error(`地址 ${urls[i]} 的类型 (${t}) 与首条 (${firstType}) 不一致，请使用同类型的服务器`);
+        }
+      }
+      game.netServerConfig.setServerConfig({
+        strategy: firstType,
+        relayUrls: urls
+      });
+      closeServerSettings();
+      const label = firstType === 'ws-fullrelay' ? '完整数据中转' : '信令中转';
+      setError(`已应用自定义服务器（${label}）。如已在房间中，连接已断开，请重新创建 / 加入房间。`);
+    } catch (err) {
+      if (errEl) errEl.textContent = '识别服务器失败：' + (err?.message || err);
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = prevText || '保存并应用'; }
+    }
   }
 
   function handleResetServerSettings() {
@@ -557,9 +641,8 @@
       game.playSound?.('click');
       handleResetServerSettings();
     });
-    dom.mpStrategyTorrent?.addEventListener('change', syncServerSettingsFieldVisibility);
-    dom.mpStrategyWsRelay?.addEventListener('change', syncServerSettingsFieldVisibility);
-    dom.mpStrategyWsFullrelay?.addEventListener('change', syncServerSettingsFieldVisibility);
+    dom.mpStrategyPublic?.addEventListener('change', syncServerSettingsFieldVisibility);
+    dom.mpStrategyCustom?.addEventListener('change', syncServerSettingsFieldVisibility);
     // 点遮罩区域关闭
     dom.mpServerSettingsOverlay.addEventListener('click', (event) => {
       if (event.target === dom.mpServerSettingsOverlay) closeServerSettings();

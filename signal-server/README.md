@@ -22,6 +22,8 @@ PORT=9000 HOST=127.0.0.1 npm start
 
 健康检查：`GET /healthz`。
 
+协议识别：`GET /ccgame-info` 返回 `{"service":"ccgame-relay","type":"ws-relay","version":1}`。游戏前端在「联机服务器」设置中选择「自定义」并填入本服务器地址后，会自动请求该接口识别中转类型。
+
 ## Docker
 
 构建并运行：

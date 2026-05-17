@@ -63,9 +63,8 @@
     // 联机：自定义中转服务器设置
     mpSettingsBtn: document.getElementById('mpSettingsBtn'),
     mpServerSettingsOverlay: document.getElementById('mpServerSettingsOverlay'),
-    mpStrategyTorrent: document.getElementById('mpStrategyTorrent'),
-    mpStrategyWsRelay: document.getElementById('mpStrategyWsRelay'),
-    mpStrategyWsFullrelay: document.getElementById('mpStrategyWsFullrelay'),
+    mpStrategyPublic: document.getElementById('mpStrategyPublic'),
+    mpStrategyCustom: document.getElementById('mpStrategyCustom'),
     mpRelayUrlsField: document.getElementById('mpRelayUrlsField'),
     mpRelayUrlsFieldLabel: document.getElementById('mpRelayUrlsFieldLabel'),
     mpRelayUrlsInput: document.getElementById('mpRelayUrlsInput'),

@@ -22,6 +22,8 @@ PORT=9000 HOST=127.0.0.1 npm start
 
 健康检查：`GET /healthz` 返回当前房间数。
 
+协议识别：`GET /ccgame-info` 返回 `{"service":"ccgame-relay","type":"ws-fullrelay","version":1}`。游戏前端在「联机服务器」设置中选择「自定义」并填入本服务器地址后，会自动请求该接口识别中转类型。
+
 ## 生产部署建议
 
 浏览器在 `https://` 页面下只能连接 `wss://`，所以生产环境务必走 TLS。推荐用 Caddy / Nginx 终结 TLS 再回源到本服务的 `ws://`。

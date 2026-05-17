@@ -27,10 +27,28 @@ const relay = createWsRelayServer({
   },
 });
 
+// 客户端联机设置里选择「自定义」后，会通过 HTTP 拉取这个协议接口来识别
+// 当前服务器属于哪种中转：'ws-relay'（仅信令）或 'ws-fullrelay'（完整数据
+// 中转）。两种服务器实现都需提供同名接口、同样的 JSON 结构。
+const INFO = JSON.stringify({
+  service: 'ccgame-relay',
+  type: 'ws-relay',
+  version: 1,
+});
+
 httpServer.on('request', (req, res) => {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, subscribers: relay.getSubscriberCount() }));
+    return;
+  }
+  if (req.url === '/ccgame-info') {
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'access-control-allow-origin': '*',
+      'cache-control': 'no-store',
+    });
+    res.end(INFO);
     return;
   }
   res.writeHead(404, { 'content-type': 'text/plain' });
