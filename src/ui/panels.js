@@ -144,6 +144,20 @@
     dom.messageEl.textContent = state.message;
     dom.hintEl.textContent = state.hint;
 
+    // 持有栏：显示当前手持物品
+    if (dom.heldBarEl) {
+      const heldItem = selected.item || { name: '空手', icon: '✊', tint: '#dbe8f0' };
+      const isEmpty = !selected || selected.isFallback;
+      const metaText = isEmpty ? '默认' : `${getItemTypeLabel(heldItem)} · x${selected.amount}`;
+      if (dom.heldBarIconEl) dom.heldBarIconEl.textContent = heldItem.icon || '•';
+      if (dom.heldBarNameEl) dom.heldBarNameEl.textContent = heldItem.name || '空手';
+      if (dom.heldBarMetaEl) dom.heldBarMetaEl.textContent = metaText;
+      dom.heldBarEl.classList.toggle('empty', isEmpty);
+      if (heldItem.tint) {
+        dom.heldBarEl.style.setProperty('--item-tint', heldItem.tint);
+      }
+    }
+
     if (dom.worldTargetPanelEl) {
       const targetInfo = getSelectedWorldTargetInfo?.();
       if (!targetInfo) {

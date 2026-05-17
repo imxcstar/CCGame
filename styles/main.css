@@ -729,6 +729,18 @@ button.primary:active {
   display: none;
 }
 
+.context-menu-desc {
+  display: none;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-color-muted);
+  margin: 0 0 4px;
+}
+
+.context-menu-desc.show {
+  display: block;
+}
+
 /* ============================================================
  * 提示信息 / 控件提示
  * ============================================================ */
@@ -846,6 +858,77 @@ body.touch-mode .controls-mobile {
   min-width: 96px;
   justify-content: center;
   text-align: center;
+}
+
+/* ============================================================
+ * 持有栏（当前手持物品）
+ * 桌面端：顶部状态信息条下方居中显示
+ * 移动端：右下角操作按钮上方
+ * ============================================================ */
+
+.held-bar {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  min-width: 160px;
+  max-width: min(280px, calc(100vw - 24px));
+  background: rgba(247, 243, 223, 0.92);
+  border: 2px solid var(--border-color-light);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text-color);
+  pointer-events: none;
+}
+
+.held-bar-icon {
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--bg-color-secondary);
+  border: 1.5px solid var(--border-color-light);
+}
+
+.held-bar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.held-bar-name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.held-bar-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.held-bar.empty .held-bar-name,
+.held-bar.empty .held-bar-meta {
+  color: var(--text-color-muted);
 }
 
 /* ============================================================
@@ -1331,6 +1414,36 @@ body.touch-mode .mobile-controls {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
   }
+
+  /* 持有栏：移动端放置在右下角操作按钮上方 */
+  .held-bar {
+    top: auto;
+    left: auto;
+    right: 18px;
+    /* action-buttons 在 bottom:22px，攻击按钮高 ~84px + sprint 行 ~70px，
+       约 170px 左右；这里抬高一点避免遮挡。 */
+    bottom: 180px;
+    transform: none;
+    min-width: 0;
+    max-width: min(220px, calc(100vw - 36px));
+    padding: 5px 10px;
+    gap: 8px;
+    z-index: 14;
+  }
+
+  .held-bar-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+
+  .held-bar-name {
+    font-size: 12px;
+  }
+
+  .held-bar-meta {
+    font-size: 10px;
+  }
 }
 
 /* 超小屏 */
@@ -1389,6 +1502,19 @@ body.touch-mode .mobile-controls {
     width: 52px;
     height: 52px;
     font-size: 11px;
+  }
+
+  .held-bar {
+    right: 14px;
+    bottom: 158px;
+    max-width: min(180px, calc(100vw - 28px));
+    padding: 4px 8px;
+  }
+
+  .held-bar-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
   }
 }
 

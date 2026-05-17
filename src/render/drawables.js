@@ -393,8 +393,60 @@
   function drawBuildGhost(shakeX, shakeY) {
     const preview = getBuildPreview();
     if (!preview) return;
+
+    // 在玩家可建造范围内绘制方格栅格，方便玩家（特别是触屏）选择目标格
+    drawBuildGrid(preview, shakeX, shakeY);
+
     const screen = worldToScreen(preview.x, preview.y, shakeX, shakeY);
     drawStructureGhost(preview.kind, screen, preview.valid);
+  }
+
+  function drawBuildGrid(preview, shakeX, shakeY) {
+    if (!preview) return;
+    const transform = getComponent(state.playerId, 'transform');
+    if (!transform) return;
+
+    // 建造范围与 canPlaceStructure 中的 dist 阈值（118）保持一致
+    const BUILD_RANGE = 118;
+    const range = BUILD_RANGE;
+    const minTileX = Math.floor((transform.x - range) / TILE);
+    const maxTileX = Math.floor((transform.x + range) / TILE);
+    const minTileY = Math.floor((transform.y - range) / TILE);
+    const maxTileY = Math.floor((transform.y + range) / TILE);
+
+    const previewTileX = Math.floor(preview.x / TILE);
+    const previewTileY = Math.floor(preview.y / TILE);
+
+    ctx.save();
+    ctx.lineWidth = 1;
+
+    for (let tx = minTileX; tx <= maxTileX; tx++) {
+      for (let ty = minTileY; ty <= maxTileY; ty++) {
+        const cx = tx * TILE + TILE * 0.5;
+        const cy = ty * TILE + TILE * 0.5;
+        // 用真实建造判定函数确定该格是否可放置（含树木 / 已有建筑 / 玩家本身等）
+        const valid = game.canPlaceStructure?.(preview.kind, cx, cy) === true;
+        const isPointed = tx === previewTileX && ty === previewTileY;
+        // 不在范围内的格子（distance 超出）不绘制，与圆形建造范围视觉一致
+        const dx = cx - transform.x;
+        const dy = cy - transform.y;
+        if (dx * dx + dy * dy > range * range) continue;
+
+        const screen = worldToScreen(cx, cy, shakeX, shakeY);
+        const x = screen.x - TILE * 0.5;
+        const y = screen.y - TILE * 0.5;
+
+        ctx.globalAlpha = isPointed ? 0.35 : 0.18;
+        ctx.fillStyle = valid ? '#83f5ce' : '#ff8da3';
+        ctx.fillRect(x, y, TILE, TILE);
+
+        ctx.globalAlpha = isPointed ? 0.85 : 0.45;
+        ctx.strokeStyle = valid ? '#1b8a6a' : '#a8425a';
+        ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+      }
+    }
+
+    ctx.restore();
   }
 
   function drawRemotePlayer(peer, shakeX, shakeY) {
