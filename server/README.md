@@ -42,6 +42,21 @@ pm2 start index.js --name ccgame-fullrelay
 pm2 save
 ```
 
+### Docker
+
+仓库自带 `Dockerfile` 与 `docker-compose.yml`：
+
+```bash
+# 构建并运行
+docker build -t ccgame-fullrelay .
+docker run --rm -p 8090:8090 ccgame-fullrelay
+
+# 或使用 docker compose
+docker compose up -d
+```
+
+容器内默认监听 `0.0.0.0:8090`，可通过 `PORT` / `HOST` 环境变量覆盖。
+
 ## 在游戏中启用
 
 1. 打开联机弹窗，点击右上角 ⚙ "自定义中转服务器"。
